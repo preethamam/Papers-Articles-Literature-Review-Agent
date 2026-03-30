@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenRouter Test</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #e4e4e7;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 640px;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #fff;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid #27272a;
+      background: #18181b;
+      color: #e4e4e7;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus { border-color: #6366f1; }
+
+    button {
+      padding: 0.75rem 1.25rem;
+      border-radius: 0.5rem;
+      border: none;
+      background: #6366f1;
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #4f46e5; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .response-box {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      min-height: 160px;
+      white-space: pre-wrap;
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    .response-box.empty {
+      color: #52525b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .usage {
+      margin-top: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      background: #1e1b4b;
+      border-radius: 0.5rem;
+      font-size: 0.8rem;
+      color: #a5b4fc;
+      display: none;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: #6366f1;
+      animation: blink 0.8s step-end infinite;
+      vertical-align: text-bottom;
+      margin-left: 1px;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>OpenRouter Streaming Test</h1>
+    <div class="input-row">
+      <input id="prompt" type="text" placeholder="Ask something..." value="How many r's are in the word 'strawberry'?" />
+      <button id="send">Send</button>
+    </div>
+    <div id="response" class="response-box empty">Response will appear here...</div>
+    <div id="usage" class="usage"></div>
+  </div>
+
+  <script>
+    const promptInput = document.getElementById("prompt");
+    const sendBtn = document.getElementById("send");
+    const responseBox = document.getElementById("response");
+    const usageBox = document.getElementById("usage");
+
+    sendBtn.addEventListener("click", send);
+    promptInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") send();
+    });
+
+    async function send() {
+      const message = promptInput.value.trim();
+      if (!message) return;
+
+      sendBtn.disabled = true;
+      responseBox.className = "response-box";
+      responseBox.innerHTML = '<span class="cursor"></span>';
+      usageBox.style.display = "none";
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message }),
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let text = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const lines = decoder.decode(value, { stream: true }).split("\n");
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const payload = line.slice(6);
+            if (payload === "[DONE]") continue;
+
+            try {
+              const data = JSON.parse(payload);
+              if (data.content) {
+                text += data.content;
+                responseBox.innerHTML = text + '<span class="cursor"></span>';
+              }
+              if (data.usage) {
+                usageBox.style.display = "block";
+                usageBox.textContent =
+                  `Tokens — prompt: ${data.usage.prompt_tokens}, completion: ${data.usage.completion_tokens}, total: ${data.usage.total_tokens}` +
+                  (data.usage.reasoningTokens ? `, reasoning: ${data.usage.reasoningTokens}` : "");
+              }
+              if (data.error) {
+                text += `\n[Error: ${data.error}]`;
+                responseBox.textContent = text;
+              }
+            } catch {}
+          }
+        }
+
+        responseBox.innerHTML = text || '<span style="color:#52525b">No response received.</span>';
+      } catch (err) {
+        responseBox.textContent = "Request failed: " + err.message;
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

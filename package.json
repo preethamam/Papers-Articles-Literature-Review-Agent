@@ -1,0 +1,17 @@
+{
+  "name": "lit-review-agent-v2",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Standalone Lit Review Agent — PDF parse (GROBID) + OpenRouter",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:app\" \"npm run dev:frontend\"",
+    "dev:app": "cd app && npx tsx server.ts",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build && echo 'Frontend built to app/public'",
+    "start": "cd app && npx tsx server.ts",
+    "package": "npm run build && echo 'Run app with: cd app && npm run dev'"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}

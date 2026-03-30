@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "/tmp/lit-review-v2/start-backend.sh",
+      "runtimeArgs": [],
+      "port": 8001
+    },
+    {
+      "name": "frontend",
+      "runtimeExecutable": "/tmp/lit-review-v2/start-frontend.sh",
+      "runtimeArgs": [],
+      "port": 5174
+    }
+  ]
+}

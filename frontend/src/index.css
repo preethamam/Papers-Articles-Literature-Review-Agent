@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+  * {
+    @apply box-border;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+  .animate-fade-in-up {
+    animation: fadeInUp 0.25s ease-out;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 99px;
+}
+
+/* Markdown-rendered prose inside chat bubbles */
+.prose-sm p { margin: 0 0 0.5em; }
+.prose-sm ul { list-style: disc; padding-left: 1.2em; margin: 0.25em 0; }
+.prose-sm li { margin: 0.15em 0; }
+.prose-sm h3, .prose-sm h2 { font-weight: 700; margin: 0.6em 0 0.3em; }
+.prose-sm code { background: #f1f5f9; padding: 0.1em 0.3em; border-radius: 4px; font-size: 0.85em; }

@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="900" height="740" viewBox="0 0 900 740" xmlns="http://www.w3.org/2000/svg" font-family="'SF Mono', 'Fira Code', monospace">
+
+  <!-- Background -->
+  <rect width="900" height="740" rx="16" fill="#0f1117"/>
+
+  <!-- Title -->
+  <text x="450" y="40" text-anchor="middle" font-size="20" font-weight="bold" fill="#f8fafc" font-family="'SF Pro Display', sans-serif">Lit Review Agent v2 — Architecture</text>
+
+  <!-- ── BROWSER LAYER ── -->
+  <rect x="40" y="65" width="820" height="90" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="60" y="88" font-size="11" fill="#94a3b8" font-weight="bold">BROWSER  (React + Vite + TailwindCSS)</text>
+
+  <!-- Nav items -->
+  <rect x="60"  y="98" width="105" height="44" rx="6" fill="#2563eb" stroke="#3b82f6" stroke-width="1"/>
+  <text x="112" y="116" text-anchor="middle" font-size="10" fill="#fff">Dashboard</text>
+  <text x="112" y="130" text-anchor="middle" font-size="9" fill="#bfdbfe">Stats overview</text>
+
+  <rect x="175" y="98" width="105" height="44" rx="6" fill="#2563eb" stroke="#3b82f6" stroke-width="1"/>
+  <text x="227" y="116" text-anchor="middle" font-size="10" fill="#fff">Library</text>
+  <text x="227" y="130" text-anchor="middle" font-size="9" fill="#bfdbfe">Browse papers</text>
+
+  <rect x="290" y="98" width="105" height="44" rx="6" fill="#7c3aed" stroke="#8b5cf6" stroke-width="1"/>
+  <text x="342" y="116" text-anchor="middle" font-size="10" fill="#fff">Query</text>
+  <text x="342" y="130" text-anchor="middle" font-size="9" fill="#ddd6fe">RAG Q&amp;A · SSE</text>
+
+  <rect x="405" y="98" width="120" height="44" rx="6" fill="#0891b2" stroke="#06b6d4" stroke-width="1"/>
+  <text x="465" y="116" text-anchor="middle" font-size="10" fill="#fff">Abstracts</text>
+  <text x="465" y="130" text-anchor="middle" font-size="9" fill="#a5f3fc">Per-paper · Synthesis</text>
+
+  <rect x="535" y="98" width="105" height="44" rx="6" fill="#059669" stroke="#10b981" stroke-width="1"/>
+  <text x="587" y="116" text-anchor="middle" font-size="10" fill="#fff">Analytics</text>
+  <text x="587" y="130" text-anchor="middle" font-size="9" fill="#a7f3d0">Charts &amp; stats</text>
+
+  <rect x="650" y="98" width="105" height="44" rx="6" fill="#d97706" stroke="#f59e0b" stroke-width="1"/>
+  <text x="702" y="116" text-anchor="middle" font-size="10" fill="#fff">Ingest</text>
+  <text x="702" y="130" text-anchor="middle" font-size="9" fill="#fde68a">ETL · SSE stream</text>
+
+  <!-- Arrow: Browser → FastAPI -->
+  <line x1="450" y1="155" x2="450" y2="195" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <polygon points="445,193 450,203 455,193" fill="#475569"/>
+  <text x="460" y="177" font-size="9" fill="#64748b">HTTP / SSE  (/api/*)</text>
+
+  <!-- ── FASTAPI LAYER ── -->
+  <rect x="40" y="205" width="820" height="160" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="60" y="226" font-size="11" fill="#94a3b8" font-weight="bold">FASTAPI  (serve.py · single process · port auto-selected)</text>
+
+  <!-- Router boxes -->
+  <rect x="60"  y="238" width="140" height="54" rx="6" fill="#1e3a5f" stroke="#2563eb" stroke-width="1"/>
+  <text x="130" y="258" text-anchor="middle" font-size="10" fill="#93c5fd" font-weight="bold">GET /papers</text>
+  <text x="130" y="272" text-anchor="middle" font-size="9" fill="#bfdbfe">GET /papers/{id}</text>
+  <text x="130" y="284" text-anchor="middle" font-size="9" fill="#bfdbfe">DELETE /papers/{id}</text>
+
+  <rect x="212" y="238" width="140" height="54" rx="6" fill="#3b1f6b" stroke="#7c3aed" stroke-width="1"/>
+  <text x="282" y="258" text-anchor="middle" font-size="10" fill="#c4b5fd" font-weight="bold">POST /query</text>
+  <text x="282" y="272" text-anchor="middle" font-size="9" fill="#ddd6fe">RAG + Claude</text>
+  <text x="282" y="284" text-anchor="middle" font-size="9" fill="#ddd6fe">SSE streaming</text>
+
+  <rect x="364" y="238" width="150" height="54" rx="6" fill="#0c3d52" stroke="#0891b2" stroke-width="1"/>
+  <text x="439" y="258" text-anchor="middle" font-size="10" fill="#67e8f9" font-weight="bold">POST /abstract/paper</text>
+  <text x="439" y="272" text-anchor="middle" font-size="9" fill="#a5f3fc">POST /abstract/synthesis</text>
+  <text x="439" y="284" text-anchor="middle" font-size="9" fill="#a5f3fc">SSE synthesis stream</text>
+
+  <rect x="526" y="238" width="140" height="54" rx="6" fill="#1c3a2e" stroke="#059669" stroke-width="1"/>
+  <text x="596" y="258" text-anchor="middle" font-size="10" fill="#6ee7b7" font-weight="bold">POST /ingest</text>
+  <text x="596" y="272" text-anchor="middle" font-size="9" fill="#a7f3d0">ETL pipeline</text>
+  <text x="596" y="284" text-anchor="middle" font-size="9" fill="#a7f3d0">SSE progress</text>
+
+  <rect x="678" y="238" width="162" height="54" rx="6" fill="#292010" stroke="#d97706" stroke-width="1"/>
+  <text x="759" y="258" text-anchor="middle" font-size="10" fill="#fcd34d" font-weight="bold">GET /stats</text>
+  <text x="759" y="272" text-anchor="middle" font-size="9" fill="#fde68a">GET /health</text>
+  <text x="759" y="284" text-anchor="middle" font-size="9" fill="#fde68a">GET /* → index.html</text>
+
+  <!-- Separator line -->
+  <line x1="60" y1="305" x2="840" y2="305" stroke="#334155" stroke-width="1" stroke-dasharray="4,3"/>
+
+  <!-- Services label -->
+  <text x="60" y="323" font-size="10" fill="#64748b">Services</text>
+
+  <rect x="60"  y="330" width="175" height="26" rx="5" fill="#0f172a" stroke="#1e40af" stroke-width="1"/>
+  <text x="147" y="346" text-anchor="middle" font-size="10" fill="#60a5fa">rag_agent.py</text>
+
+  <rect x="247" y="330" width="175" height="26" rx="5" fill="#0f172a" stroke="#1e40af" stroke-width="1"/>
+  <text x="334" y="346" text-anchor="middle" font-size="10" fill="#60a5fa">abstract_service.py</text>
+
+  <rect x="434" y="330" width="175" height="26" rx="5" fill="#0f172a" stroke="#1e40af" stroke-width="1"/>
+  <text x="521" y="346" text-anchor="middle" font-size="10" fill="#60a5fa">vectorstore.py  (SPECTER)</text>
+
+  <rect x="621" y="330" width="220" height="26" rx="5" fill="#0f172a" stroke="#1e40af" stroke-width="1"/>
+  <text x="731" y="346" text-anchor="middle" font-size="10" fill="#60a5fa">etl/pipeline · extractor · transformer · loader</text>
+
+  <!-- Arrows down from FastAPI -->
+  <line x1="280" y1="365" x2="280" y2="405" stroke="#475569" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="275,403 280,413 285,403" fill="#475569"/>
+  <line x1="520" y1="365" x2="520" y2="405" stroke="#475569" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="515,403 520,413 525,403" fill="#475569"/>
+  <line x1="760" y1="365" x2="760" y2="405" stroke="#475569" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="755,403 760,413 765,403" fill="#475569"/>
+
+  <!-- ── CHROMADB ── -->
+  <rect x="40" y="415" width="380" height="80" rx="10" fill="#1e293b" stroke="#4f46e5" stroke-width="1.5"/>
+  <text x="230" y="437" text-anchor="middle" font-size="11" fill="#a5b4fc" font-weight="bold">ChromaDB  (papers_specter collection)</text>
+  <rect x="60" y="447" width="160" height="34" rx="5" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+  <text x="140" y="462" text-anchor="middle" font-size="10" fill="#c7d2fe">SPECTER embeddings</text>
+  <text x="140" y="476" text-anchor="middle" font-size="9" fill="#a5b4fc">768-dim · cosine similarity</text>
+  <rect x="235" y="447" width="165" height="34" rx="5" fill="#1e1b4b" stroke="#4f46e5" stroke-width="1"/>
+  <text x="317" y="462" text-anchor="middle" font-size="10" fill="#c7d2fe">Metadata store</text>
+  <text x="317" y="476" text-anchor="middle" font-size="9" fill="#a5b4fc">title · authors · year · category</text>
+
+  <!-- ── CLAUDE API ── -->
+  <rect x="460" y="415" width="400" height="80" rx="10" fill="#1e293b" stroke="#e879f9" stroke-width="1.5"/>
+  <text x="660" y="437" text-anchor="middle" font-size="11" fill="#f0abfc" font-weight="bold">Anthropic Claude  (claude-sonnet-4-6)</text>
+  <rect x="480" y="447" width="115" height="34" rx="5" fill="#2d1b4e" stroke="#a855f7" stroke-width="1"/>
+  <text x="537" y="462" text-anchor="middle" font-size="10" fill="#d8b4fe">RAG answers</text>
+  <text x="537" y="476" text-anchor="middle" font-size="9" fill="#c4b5fd">streaming · citations</text>
+  <rect x="606" y="447" width="115" height="34" rx="5" fill="#2d1b4e" stroke="#a855f7" stroke-width="1"/>
+  <text x="663" y="462" text-anchor="middle" font-size="10" fill="#d8b4fe">Abstracts</text>
+  <text x="663" y="476" text-anchor="middle" font-size="9" fill="#c4b5fd">4-section structured</text>
+  <rect x="732" y="447" width="108" height="34" rx="5" fill="#2d1b4e" stroke="#a855f7" stroke-width="1"/>
+  <text x="786" y="462" text-anchor="middle" font-size="10" fill="#d8b4fe">Synthesis</text>
+  <text x="786" y="476" text-anchor="middle" font-size="9" fill="#c4b5fd">[Author YEAR] cites</text>
+
+  <!-- Arrow: ETL → PDF Files -->
+  <line x1="760" y1="495" x2="760" y2="535" stroke="#475569" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="755,533 760,543 765,533" fill="#475569"/>
+
+  <!-- ── ETL + PDF ── -->
+  <rect x="580" y="545" width="360" height="75" rx="10" fill="#1e293b" stroke="#b45309" stroke-width="1.5"/>
+  <text x="760" y="567" text-anchor="middle" font-size="11" fill="#fcd34d" font-weight="bold">ETL Pipeline</text>
+  <rect x="600" y="576" width="100" height="28" rx="5" fill="#27180a" stroke="#d97706" stroke-width="1"/>
+  <text x="650" y="594" text-anchor="middle" font-size="9" fill="#fde68a">pdfplumber</text>
+  <rect x="712" y="576" width="100" height="28" rx="5" fill="#27180a" stroke="#d97706" stroke-width="1"/>
+  <text x="762" y="594" text-anchor="middle" font-size="9" fill="#fde68a">PyMuPDF fallback</text>
+  <rect x="824" y="576" width="100" height="28" rx="5" fill="#27180a" stroke="#d97706" stroke-width="1"/>
+  <text x="874" y="594" text-anchor="middle" font-size="9" fill="#fde68a">Claude tool-use</text>
+
+  <!-- ── DISK STORAGE ── -->
+  <rect x="40" y="545" width="510" height="75" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+  <text x="295" y="567" text-anchor="middle" font-size="11" fill="#94a3b8" font-weight="bold">Local Disk</text>
+  <rect x="60" y="576" width="140" height="28" rx="5" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+  <text x="130" y="594" text-anchor="middle" font-size="9" fill="#94a3b8">backend/data/chroma/</text>
+  <rect x="214" y="576" width="155" height="28" rx="5" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+  <text x="291" y="594" text-anchor="middle" font-size="9" fill="#94a3b8">data/results/extractions/*.json</text>
+  <rect x="383" y="576" width="147" height="28" rx="5" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+  <text x="456" y="594" text-anchor="middle" font-size="9" fill="#94a3b8">Articles/  (PDFs source)</text>
+
+  <!-- ── LEGEND ── -->
+  <rect x="40" y="640" width="820" height="88" rx="10" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <text x="60" y="660" font-size="10" fill="#64748b" font-weight="bold">DATA FLOW</text>
+
+  <rect x="60" y="670" width="14" height="8" fill="#7c3aed" rx="2"/>
+  <text x="80" y="679" font-size="9" fill="#94a3b8">Query: Browser → FastAPI → SPECTER retrieval → Claude (SSE stream) → Browser</text>
+
+  <rect x="60" y="686" width="14" height="8" fill="#d97706" rx="2"/>
+  <text x="80" y="695" font-size="9" fill="#94a3b8">Ingest: Articles/ PDF → pdfplumber → Claude tool-use → SPECTER embed → ChromaDB + JSON</text>
+
+  <rect x="60" y="702" width="14" height="8" fill="#0891b2" rx="2"/>
+  <text x="80" y="711" font-size="9" fill="#94a3b8">Abstract: Paper JSON → Claude → Obj/Methods/Results/Conclusion  |  Synthesis: top-K chunks → Claude → [Cite] paragraph</text>
+
+  <text x="840" y="720" text-anchor="end" font-size="9" fill="#334155">Lit Review Agent v2 · USC Research · MIT License</text>
+</svg>
