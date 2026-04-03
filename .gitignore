@@ -70,3 +70,6 @@ logs/
 .pytest_cache/
 htmlcov/
 .coverage
+
+# Local PDF corpus (large; GitHub limit 100 MB per file — use app upload instead)
+Articles/
