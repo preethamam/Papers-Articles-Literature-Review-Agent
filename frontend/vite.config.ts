@@ -1,8 +1,13 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-export default defineConfig({
+// Load repo-root `.env` so `PORT` matches `app/server.ts` (parent of `frontend/`).
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, path.resolve(__dirname, '..'), '')
+  const apiPort = env.PORT || '3456'
+
+  return {
   plugins: [react()],
   resolve: {
     alias: {
@@ -13,7 +18,7 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': {
-        target: 'http://localhost:3456',
+        target: `http://127.0.0.1:${apiPort}`,
         changeOrigin: true,
       },
     },
@@ -22,4 +27,5 @@ export default defineConfig({
     outDir: '../app/public',
     emptyOutDir: true,
   },
+  }
 })

@@ -182,7 +182,15 @@ export const parseArticle = (file: File) => {
   }).then((r) => r.data)
 }
 
-export type BatchProgressEvent = { event: string; total?: number; current?: number; filename?: string; status?: string; error?: string }
+export type BatchProgressEvent = {
+  event: string
+  total?: number
+  current?: number
+  filename?: string
+  status?: string
+  error?: string
+  cached?: boolean
+}
 
 export function parseArticleBatch(
   files: File[],

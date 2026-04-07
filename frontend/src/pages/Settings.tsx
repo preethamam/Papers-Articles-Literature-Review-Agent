@@ -7,6 +7,7 @@ export default function Settings() {
   const [settings, setSettings] = useState<Settings>({})
   const [models, setModels] = useState<Array<{ id: string; name?: string }>>([])
   const [grobidAlive, setGrobidAlive] = useState<boolean | null>(null)
+  const [grobidStartMessage, setGrobidStartMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [apiKeyVisible, setApiKeyVisible] = useState(false)
   const [apiKeyValue, setApiKeyValue] = useState('')
@@ -40,9 +41,38 @@ export default function Settings() {
   }
 
   const handleStartGrobid = () => {
+    setGrobidStartMessage(null)
+    // #region agent log
+    fetch('http://127.0.0.1:7545/ingest/1a02892b-d039-4b48-a9ae-2d66a0b62737', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c1ca1d' },
+      body: JSON.stringify({
+        sessionId: 'c1ca1d',
+        runId: 'grobid-docker',
+        hypothesisId: 'H4',
+        location: 'Settings.tsx:handleStartGrobid:click',
+        message: 'Start with Docker button clicked',
+        data: {},
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+
     startGrobid()
-      .then(() => getGrobidStatus().then((r) => setGrobidAlive(r.alive)))
-      .catch(() => {})
+      .then(() =>
+        getGrobidStatus()
+          .then((r) => {
+            setGrobidAlive(r.alive)
+            setGrobidStartMessage(r.alive ? 'GROBID started successfully.' : 'Docker command ran, but GROBID is still offline.')
+          })
+          .catch(() => {}),
+      )
+      .catch((e: unknown) => {
+        const msg =
+          (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error ||
+          (e instanceof Error ? e.message : 'Failed to start GROBID with Docker')
+        setGrobidStartMessage(msg)
+      })
   }
 
   return (
@@ -114,6 +144,9 @@ export default function Settings() {
           <p className="text-[12px] text-slate-400 mt-2">
             Run GROBID via Docker: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-slate-800 dark:text-slate-200">docker run -d --name grobid -p 8070:8070 lfoppiano/grobid:0.8.1</code>
           </p>
+          {grobidStartMessage && (
+            <p className="text-[12px] mt-2 text-slate-600 dark:text-slate-300 break-all">{grobidStartMessage}</p>
+          )}
         </div>
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-card border border-slate-100 dark:border-slate-800">

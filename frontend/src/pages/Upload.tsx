@@ -9,12 +9,14 @@ interface FileItem {
   file: File
   status: FileStatus
   error?: string
+  cached?: boolean
 }
 
 export default function Upload() {
   const [files, setFiles] = useState<FileItem[]>([])
   const [dragging, setDragging] = useState(false)
   const [parsing, setParsing] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 })
   const { refetch } = useArticles()
 
   const addFiles = (list: FileList | null) => {
@@ -26,10 +28,10 @@ export default function Upload() {
     ])
   }
 
-  const setFileStatusByName = (filename: string, status: FileStatus, error?: string) => {
+  const setFileStatusByName = (filename: string, status: FileStatus, error?: string, cached?: boolean) => {
     setFiles((prev) =>
       prev.map((item) =>
-        item.file.name === filename ? { ...item, status, error } : item
+        item.file.name === filename ? { ...item, status, error, cached: cached ?? item.cached } : item
       )
     )
   }
@@ -38,16 +40,27 @@ export default function Upload() {
     const pending = files.filter((f) => f.status === 'pending')
     if (pending.length === 0) return
     setParsing(true)
+    setBatchProgress({ current: 0, total: pending.length })
     try {
       await parseArticleBatch(
         pending.map((f) => f.file),
         (ev) => {
+          if (ev.event === 'start') {
+            setBatchProgress({ current: 0, total: ev.total ?? pending.length })
+          }
           if (ev.event === 'progress' && ev.filename != null) {
             setFileStatusByName(
               ev.filename,
               ev.status === 'done' ? 'done' : ev.status === 'error' ? 'error' : 'parsing',
-              ev.error
+              ev.error,
+              Boolean(ev.cached)
             )
+            if (typeof ev.current === 'number' && typeof ev.total === 'number') {
+              setBatchProgress({ current: ev.current, total: ev.total })
+            }
+          }
+          if (ev.event === 'done') {
+            setBatchProgress((p) => ({ current: p.total || pending.length, total: p.total || pending.length }))
           }
         }
       )
@@ -62,6 +75,7 @@ export default function Upload() {
   }
 
   const hasPending = files.some((f) => f.status === 'pending')
+  const progressPct = batchProgress.total > 0 ? Math.min(100, Math.round((batchProgress.current / batchProgress.total) * 100)) : 0
 
   return (
     <div className="p-8 max-w-2xl mx-auto">
@@ -112,6 +126,24 @@ export default function Upload() {
               Parse all
             </button>
           </div>
+          {(parsing || batchProgress.total > 0) && (
+            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[12px] font-medium text-slate-600">
+                  Parsing progress
+                </span>
+                <span className="text-[12px] text-slate-500 tabular-nums">
+                  {batchProgress.current}/{batchProgress.total} ({progressPct}%)
+                </span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                <div
+                  className="h-full bg-violet-600 transition-all duration-300 ease-out"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+          )}
           <ul className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
             {files.map((item, i) => (
               <li key={i} className="flex items-center gap-3 px-4 py-3">
@@ -130,7 +162,14 @@ export default function Upload() {
                     <Loader2 className="w-4 h-4 animate-spin text-violet-500" />
                   )}
                   {item.status === 'done' && (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    <>
+                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                      {item.cached && (
+                        <span className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                          Cached
+                        </span>
+                      )}
+                    </>
                   )}
                   {item.status === 'error' && (
                     <AlertCircle className="w-5 h-5 text-red-500" />

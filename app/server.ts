@@ -41,10 +41,20 @@ const PORT = Number(process.env.PORT) || 3456;
 
 function start() {
   getDb();
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     const url = `http://localhost:${PORT}`;
     console.log(`Lit Review Agent running at ${url}`);
     open(url).catch(() => {});
+  });
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`\nPort ${PORT} is already in use.\n`);
+      console.error(`Free it:  kill -9 $(lsof -ti :${PORT})`);
+      console.error(`Or pick a free port in repo .env:  PORT=37891`);
+      console.error(`(If you use npm run dev, set the same PORT in .env so Vite proxies /api correctly.)\n`);
+      process.exit(1);
+    }
+    throw err;
   });
 }
 
