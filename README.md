@@ -1,129 +1,80 @@
 # Lit Review Agent v2
 
-A Claude-powered, domain-agnostic literature review assistant that runs entirely on your machine. Drop in academic PDFs, then query them with natural language, generate structured abstracts, and synthesize literature review paragraphs — all streamed in real time.
+Local-first literature review assistant with:
 
-## Features
+- PDF parsing through GROBID
+- TEI metadata extraction (title, authors, abstract, venue, links)
+- Cached LLM workflows (intro/metadata, section summary, literature review)
+- Multi-paper chat and citations
+- Metadata explorer + Excel export
 
-| Feature | Description |
-|---|---|
-| **Semantic search** | SPECTER embeddings (AllenAI, scientific-paper optimized) over your PDF library |
-| **RAG Q&A** | Ask anything; get answers with inline citations streamed via Claude |
-| **Per-paper abstracts** | Generate structured Objective / Methods / Results / Conclusion abstracts |
-| **Literature synthesis** | Multi-paper synthesis paragraph with `[Author YEAR]` citations |
-| **Analytics** | Venue breakdown, year distribution, dataset mentions, category stats |
-| **Standalone** | Single `python serve.py` command — no Docker, no cloud |
+## Stack
 
-## Architecture
+- `frontend/`: React + Vite + Tailwind
+- `app/`: Express + TypeScript + SQLite (`better-sqlite3`)
+- Local DB path: `~/.litreview/data.db`
 
-```
-┌────────────────────────────────────────────────────────────┐
-│                     Browser (React SPA)                    │
-│   Dashboard · Library · Query · Abstracts · Analytics ·   │
-│                         Ingest                             │
-└─────────────────────────┬──────────────────────────────────┘
-                          │ HTTP / SSE  (/api/*)
-┌─────────────────────────▼──────────────────────────────────┐
-│                   FastAPI  (serve.py)                      │
-│                                                            │
-│  ┌─────────┐  ┌────────┐  ┌──────────┐  ┌─────────────┐  │
-│  │ /papers │  │ /query │  │/abstract │  │   /ingest   │  │
-│  └────┬────┘  └───┬────┘  └────┬─────┘  └──────┬──────┘  │
-│       │           │            │                │          │
-│  ┌────▼───────────▼────────────▼────┐  ┌────────▼──────┐  │
-│  │         VectorStore              │  │  ETL Pipeline │  │
-│  │  SPECTER SentenceTransformer     │  │  pdfplumber   │  │
-│  │  ChromaDB  (papers_specter)      │  │  + PyMuPDF    │  │
-│  └──────────────────────────────────┘  └───────────────┘  │
-│                                                            │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │            Anthropic Claude  (claude-sonnet-4-6)     │  │
-│  │  RAG · Abstract generation · Literature synthesis    │  │
-│  └──────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────┘
-         │                                  │
-   backend/data/chroma/           backend/data/results/
-   (vector embeddings)            (extraction JSONs)
-```
+## Prerequisites
 
-## Requirements
+- Node.js 20+ (Node 22 recommended)
+- npm 10+
+- GROBID running locally or reachable on your network
+- OpenRouter API key
 
-- **Python** 3.10+
-- **Node.js** 18+
-- **Anthropic API key** — [get one here](https://console.anthropic.com/)
-- ~600 MB disk for SPECTER model (downloaded once on first ingest)
-
-## Quick start
+## Install from GitHub
 
 ```bash
-# 1. Clone
-git clone https://github.com/your-org/lit-review-agent-v2
-cd lit-review-agent-v2
-
-# 2. Install everything + build frontend
+git clone https://github.com/<your-user>/<your-repo>.git
+cd "<your-repo>"
 bash install.sh
-
-# 3. Add your API key
-echo "ANTHROPIC_API_KEY=sk-ant-..." >> .env
-
-# 4. Launch
-python serve.py
-# → opens http://localhost:8080 in your browser
 ```
 
-## Manual setup (Makefile)
+The installer will:
+
+- install npm dependencies for root, `app`, and `frontend`
+- create `.env` from `.env.example` if needed
+- build the frontend into `app/public`
+
+## Configure environment
+
+Edit `.env`:
+
+```env
+OPENROUTER_API_KEY=sk-or-v1-...
+GROBID_URL=http://localhost:8070
+```
+
+## Run
+
+Production-style single server:
 
 ```bash
-make install   # venv + npm install
-make build     # npm run build → backend/static/
-make run       # python serve.py  (picks free port, opens browser)
+npm start
 ```
 
-## Development mode (hot-reload)
+Dev mode (frontend HMR + backend):
 
 ```bash
-make dev
-# Backend:  http://localhost:8001  (uvicorn --reload)
-# Frontend: http://localhost:5174  (Vite HMR)
+npm run dev
 ```
 
-## Adding papers
+- Frontend dev URL: `http://localhost:5174`
+- Backend URL: `http://localhost:3456`
 
-1. Drop PDF files into the `Articles/` folder (any subdirectory structure).
-2. Open the app → **Ingest** page → click **Start Ingest**.
-3. Watch real-time progress as each paper is extracted, chunked, and embedded.
+## Common scripts
 
-Or point to an existing folder via `.env`:
+```bash
+npm run dev        # backend + frontend
+npm run build      # build frontend to app/public
+npm start          # run express app
 ```
-ARTICLES_DIR=/Users/you/Papers/
-```
 
-## Configuration
+## Notes for end users
 
-All settings in `.env` (see `.env.example`):
-
-| Variable | Default | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | *(required)* | Your Anthropic key |
-| `CLAUDE_MODEL` | `claude-sonnet-4-6` | Claude model ID |
-| `EMBEDDING_MODEL` | `allenai-specter` | HuggingFace model name |
-| `ARTICLES_DIR` | `./Articles/` | PDF source folder |
-| `CHUNK_SIZE` | `600` | Tokens per chunk |
-| `TOP_K` | `10` | Retrieved chunks per query |
-
-## API endpoints
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Liveness check |
-| `GET` | `/stats` | Collection statistics |
-| `GET` | `/papers` | List papers (filter by category/year) |
-| `GET` | `/papers/{id}` | Paper detail + chunks |
-| `DELETE` | `/papers/{id}` | Remove paper from index |
-| `POST` | `/ingest` | Ingest PDFs (SSE stream) |
-| `POST` | `/query` | RAG Q&A (SSE stream) |
-| `POST` | `/abstract/paper/{id}` | Generate structured abstract |
-| `POST` | `/abstract/synthesis` | Literature synthesis (SSE stream) |
+- GROBID is not bundled in this repository.
+- Configure GROBID URL in Settings in the app.
+- Export metadata is tracked in DB settings (last export timestamp/count/scope).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see `LICENSE`.

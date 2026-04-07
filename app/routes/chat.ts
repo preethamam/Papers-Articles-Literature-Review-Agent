@@ -1,11 +1,25 @@
 import { Router, Request, Response } from "express";
 import { createOpenRouter } from "../lib/openrouter.js";
 import { getSetting } from "../db.js";
+import { buildArticleContextSystemBlock } from "../lib/chatArticleContext.js";
+import {
+  INTRO_ABSTRACT_CHAT_SYSTEM,
+  LITERATURE_SYNTHESIS_SYSTEM,
+  SUMMARIZE_SET_CHAT_SYSTEM,
+} from "../lib/prompts.js";
+import { validateCiteTargets } from "../lib/chatCiteGuard.js";
 
 const router = Router();
 
 router.post("/", async (req: Request, res: Response) => {
-  const { message, model, files, system } = req.body;
+  const { message, model, files, system, mode } = req.body;
+  const articleIdsRaw = req.body.articleIds;
+  const articleIds = Array.isArray(articleIdsRaw)
+    ? articleIdsRaw.map((id: unknown) => String(id).trim()).filter(Boolean)
+    : typeof articleIdsRaw === "string"
+      ? articleIdsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+
   if (!message) {
     res.status(400).json({ error: "message is required" });
     return;
@@ -37,29 +51,57 @@ router.post("/", async (req: Request, res: Response) => {
   }
   contentParts.push({ type: "text", text: message });
 
+  const docBlock = buildArticleContextSystemBlock(articleIds);
+  const systemParts: string[] = [];
+  if (mode === "lit_review_synthesis") {
+    systemParts.push(LITERATURE_SYNTHESIS_SYSTEM);
+  } else if (mode === "summarize_set") {
+    systemParts.push(SUMMARIZE_SET_CHAT_SYSTEM);
+  } else if (mode === "intro_abstract") {
+    systemParts.push(INTRO_ABSTRACT_CHAT_SYSTEM);
+  }
+  if (typeof system === "string" && system.trim()) systemParts.push(system.trim());
+  if (docBlock) systemParts.push(docBlock);
+  const combinedSystem = systemParts.length > 0 ? systemParts.join("\n\n---\n\n") : undefined;
+
   const messages: Array<{ role: string; content: string | typeof contentParts }> = [];
-  if (system) messages.push({ role: "system", content: system });
+  if (combinedSystem) messages.push({ role: "system", content: combinedSystem });
   messages.push({ role: "user", content: contentParts });
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
+  const allowedCiteIds = new Set(articleIds);
+
   try {
     const openrouter = createOpenRouter(apiKey);
     const stream = await openrouter.chat.send({
       chatGenerationParams: {
         model: selectedModel,
-        messages,
+        messages: messages as unknown as never[],
         stream: true,
       },
     });
 
+    let fullText = "";
     for await (const chunk of stream) {
       const content = chunk.choices?.[0]?.delta?.content;
-      if (content) res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      if (content) {
+        fullText += content;
+        res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      }
       if (chunk.usage) res.write(`data: ${JSON.stringify({ usage: chunk.usage })}\n\n`);
     }
+
+    if (articleIds.length > 0 && fullText) {
+      const citeCheck = validateCiteTargets(fullText, allowedCiteIds);
+      if (!citeCheck.ok) {
+        const note = `\n\n[Citation check] Unknown cite target(s): ${citeCheck.invalid.join(", ")}. Use only Internal IDs from the context.`;
+        res.write(`data: ${JSON.stringify({ content: note })}\n\n`);
+      }
+    }
+
     res.write("data: [DONE]\n\n");
     res.end();
   } catch (err: unknown) {

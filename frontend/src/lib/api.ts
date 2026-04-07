@@ -12,6 +12,14 @@ export interface Article {
   xml: string | null
   parsed_at: string | null
   model_used: string | null
+  year?: number | null
+  venue_type?: string | null
+  venue_name?: string | null
+  links_json?: string | null
+  /** Present when listing with `include_reviews` — cached LLM outputs */
+  llm_intro?: string | null
+  llm_summary?: string | null
+  llm_literature_review?: string | null
 }
 
 export interface ArticleWithReviews extends Article {
@@ -23,6 +31,7 @@ export interface Review {
   article_id: string
   task: number
   model: string
+  review_depth: string
   result: string
   created_at: string
 }
@@ -77,8 +86,82 @@ export interface StatsResponse {
 }
 
 // ----- Articles -----
-export const getArticles = (params?: { search?: string; sort?: string; order?: string }) =>
-  api.get<Article[]>('/articles', { params }).then((r) => r.data)
+export const getArticles = (params?: {
+  search?: string
+  sort?: string
+  order?: string
+  year_min?: number
+  year_max?: number
+  venue_type?: string
+  /** Omit TEI XML for lighter list responses (Metadata page, etc.). Default true. */
+  include_xml?: boolean
+  /** Attach cached LLM fields (intro, section summary, literature review). */
+  include_reviews?: boolean
+}) => api.get<Article[]>('/articles', { params }).then((r) => r.data)
+
+export type ArticleMeta = Pick<Article, 'id' | 'title' | 'pdf_path'>
+
+export const getArticlesMeta = (ids: string[]) => {
+  if (ids.length === 0) return Promise.resolve([] as ArticleMeta[])
+  return api
+    .get<ArticleMeta[]>('/articles/meta', { params: { ids: ids.join(',') } })
+    .then((r) => r.data)
+}
+
+/** Trigger download of library-export.xlsx (all articles, or selected ids). */
+export type DatabaseInfo = {
+  displayPath: string
+  resolvedPath: string
+  litreviewDir: string
+  articleCount: number
+  reviewRowCount: number
+  exportStats?: {
+    lastAt: string | null
+    lastScope: string | null
+    lastRows: number
+    lastLinkRows: number
+    totalCount: number
+  }
+  storedFields: string[]
+}
+
+function isDatabaseInfo(d: unknown): d is DatabaseInfo {
+  if (!d || typeof d !== 'object') return false
+  const o = d as Record<string, unknown>
+  return (
+    typeof o.displayPath === 'string' &&
+    typeof o.resolvedPath === 'string' &&
+    typeof o.litreviewDir === 'string' &&
+    typeof o.articleCount === 'number' &&
+    typeof o.reviewRowCount === 'number' &&
+    Array.isArray(o.storedFields) &&
+    o.storedFields.every((x) => typeof x === 'string')
+  )
+}
+
+export const getDatabaseInfo = () =>
+  api.get<DatabaseInfo>('/meta/database').then((r) => {
+    const d = r.data as unknown
+    if (!isDatabaseInfo(d)) {
+      throw new Error(
+        'Unexpected response from the metadata API (got HTML or an old server). Restart the backend so /api/meta/database is available.',
+      )
+    }
+    return d
+  })
+
+export async function downloadArticlesExport(ids?: string[]): Promise<void> {
+  const q = ids?.length ? `?ids=${encodeURIComponent(ids.join(','))}` : ''
+  const res = await fetch(`/api/articles/export${q}`)
+  if (!res.ok) throw new Error(res.statusText)
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'library-export.xlsx'
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 export const getArticle = (id: string) =>
   api.get<ArticleWithReviews>(`/articles/${id}`).then((r) => r.data)
@@ -142,14 +225,25 @@ export function runReview(
   model?: string,
   onChunk?: (content: string) => void,
   onUsage?: (usage: Record<string, unknown>) => void,
-  onError?: (error: string) => void
+  onError?: (error: string) => void,
+  depth?: 'one_line' | 'five_line' | 'detailed'
 ): Promise<void> {
   return fetch(`/api/reviews/${articleId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task, model }),
+    body: JSON.stringify({
+      task,
+      model,
+      ...(task === 2 ? { depth: depth ?? 'detailed' } : {}),
+    }),
   }).then(async (res) => {
     if (!res.ok) throw new Error(res.statusText)
+    const ct = res.headers.get('content-type') || ''
+    if (ct.includes('application/json')) {
+      const data = (await res.json()) as { result?: string; cached?: boolean }
+      if (data.result) onChunk?.(data.result)
+      return
+    }
     if (!res.body) return
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -214,9 +308,17 @@ export const getPaperAbstract = (_paperId: string, _forceRegenerate = false) =>
   Promise.reject(new Error('Use Review panel instead'))
 
 // ----- Chat (streaming) -----
+export type ChatMode = 'lit_review_synthesis' | 'summarize_set' | 'intro_abstract'
+
 export function sendChat(
   message: string,
-  options: { model?: string; system?: string; files?: Array<{ name: string; type: string; text?: string; data?: string }> },
+  options: {
+    model?: string
+    system?: string
+    articleIds?: string[]
+    mode?: ChatMode
+    files?: Array<{ name: string; type: string; text?: string; data?: string }>
+  },
   onChunk: (content: string) => void,
   onUsage?: (usage: Record<string, unknown>) => void,
   onError?: (error: string) => void
@@ -228,6 +330,8 @@ export function sendChat(
       message,
       model: options.model,
       system: options.system,
+      articleIds: options.articleIds?.length ? options.articleIds : undefined,
+      mode: options.mode,
       files: options.files,
     }),
   }).then((res) => {

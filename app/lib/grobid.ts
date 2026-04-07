@@ -11,7 +11,7 @@ export async function parsePdfToXml(
 ): Promise<string> {
   const url = getGrobidUrl(baseUrl);
   const form = new FormData();
-  form.append("input", new Blob([pdfBuffer], { type: "application/pdf" }), filename);
+  form.append("input", new Blob([new Uint8Array(pdfBuffer)], { type: "application/pdf" }), filename);
   form.append("consolidateHeader", "1");
   form.append("consolidateCitations", "0");
 

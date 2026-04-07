@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
   }
   * {
     @apply box-border;
@@ -32,6 +32,9 @@
   background: #cbd5e1;
   border-radius: 99px;
 }
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
 
 /* Markdown-rendered prose inside chat bubbles */
 .prose-sm p { margin: 0 0 0.5em; }
@@ -39,3 +42,4 @@
 .prose-sm li { margin: 0.15em 0; }
 .prose-sm h3, .prose-sm h2 { font-weight: 700; margin: 0.6em 0 0.3em; }
 .prose-sm code { background: #f1f5f9; padding: 0.1em 0.3em; border-radius: 4px; font-size: 0.85em; }
+.dark .prose-sm code { background: #334155; color: #e2e8f0; }

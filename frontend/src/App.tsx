@@ -1,24 +1,37 @@
 import { BrowserRouter, NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import {
-  BookOpen, FileText, LayoutDashboard, MessageSquare, Settings, Upload,
+  BookOpen,
+  Database,
+  FileText,
+  LayoutDashboard,
+  MessageSquare,
+  Moon,
+  Settings,
+  Sun,
+  Upload,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTheme } from '@/hooks/useTheme'
 import Dashboard from '@/pages/Dashboard'
 import Library from '@/pages/Library'
 import ArticlePage from '@/pages/ArticlePage'
 import Query from '@/pages/Query'
 import UploadPage from '@/pages/Upload'
 import SettingsPage from '@/pages/Settings'
+import MetadataPage from '@/pages/Metadata'
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/library', label: 'Library', icon: BookOpen },
   { to: '/upload', label: 'Upload', icon: Upload },
   { to: '/query', label: 'Chat', icon: MessageSquare },
+  { to: '/metadata', label: 'Metadata', icon: Database },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 function Sidebar() {
+  const { theme, toggle } = useTheme()
+
   return (
     <aside className="w-[220px] min-h-screen bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-slate-100 flex flex-col py-6 px-3 shrink-0 relative overflow-hidden">
       <div className="absolute -top-20 -left-20 w-60 h-60 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -73,7 +86,15 @@ function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto px-3 pt-6">
+      <div className="mt-auto px-3 pt-6 space-y-3">
+        <button
+          type="button"
+          onClick={toggle}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-[12px] font-medium bg-white/[0.06] hover:bg-white/[0.1] text-slate-200 border border-white/[0.08] transition-colors"
+        >
+          {theme === 'dark' ? <Sun className="w-3.5 h-3.5 text-amber-300" /> : <Moon className="w-3.5 h-3.5 text-slate-300" />}
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        </button>
         <div className="border-t border-white/[0.06] pt-4">
           <p className="text-[10px] text-slate-600 font-medium">v2.0.0 · Standalone</p>
         </div>
@@ -89,9 +110,9 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-[#f8fafc]">
+    <div className="flex min-h-screen bg-[#f8fafc] dark:bg-slate-950">
       <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-[#f8fafc] dark:bg-slate-950 text-slate-900 dark:text-slate-100">
         <PageWrapper>{children}</PageWrapper>
       </main>
     </div>
@@ -108,6 +129,7 @@ export default function App() {
           <Route path="/library/article/:id" element={<ArticlePage />} />
           <Route path="/upload" element={<UploadPage />} />
           <Route path="/query" element={<Query />} />
+          <Route path="/metadata" element={<MetadataPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </Layout>

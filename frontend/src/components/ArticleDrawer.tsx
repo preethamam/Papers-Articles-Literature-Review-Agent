@@ -9,6 +9,8 @@ import MarkdownContent from '@/components/MarkdownContent'
 
 type Tab = 'overview' | 'extracted' | 'task1' | 'task2' | 'task3'
 
+type Task2Depth = 'one_line' | 'five_line' | 'detailed'
+
 const TASK_LABELS: Record<number, string> = {
   1: 'Metadata & Links',
   2: 'Section Summary',
@@ -22,9 +24,14 @@ interface Props {
   onRefetch?: () => void
 }
 
+function streamKey(task: number, task2Depth: Task2Depth): string {
+  return task === 2 ? `2-${task2Depth}` : String(task)
+}
+
 export default function ArticleDrawer({ article, articleId, onClose, onRefetch }: Props) {
   const [tab, setTab] = useState<Tab>('extracted')
-  const [streaming, setStreaming] = useState<Record<number, string>>({})
+  const [streaming, setStreaming] = useState<Record<string, string>>({})
+  const [task2Depth, setTask2Depth] = useState<Task2Depth>('detailed')
   const [loadingTask, setLoadingTask] = useState<number | null>(null)
   const [selectedModel, setSelectedModel] = useState<Record<number, string>>({})
   const [models, setModels] = useState<Array<{ id: string }>>([])
@@ -70,25 +77,36 @@ export default function ArticleDrawer({ article, articleId, onClose, onRefetch }
     }
   })()
 
-  const getCachedForTask = (task: number) => reviews.filter((r) => r.task === task)
+  const getCachedForTask = (task: number, depth?: Task2Depth) => {
+    if (task === 2 && depth) {
+      const d = depth
+      return reviews.filter((r) => r.task === task && (r.review_depth || '') === d)
+    }
+    return reviews.filter((r) => r.task === task)
+  }
+
   const getStreamingOrCached = (task: number) => {
-    const stream = streaming[task]
+    const key = streamKey(task, task2Depth)
+    const stream = streaming[key]
     if (stream) return stream
-    const cached = getCachedForTask(task)[0]
+    const cachedList = task === 2 ? getCachedForTask(task, task2Depth) : getCachedForTask(task)
+    const cached = cachedList[0]
     return cached?.result ?? ''
   }
 
   const handleGenerate = (task: 1 | 2 | 3) => {
     const model = selectedModel[task] || defaultModels[`task${task}`] || 'openrouter/free'
+    const key = streamKey(task, task2Depth)
     setLoadingTask(task)
-    setStreaming((s) => ({ ...s, [task]: '' }))
+    setStreaming((s) => ({ ...s, [key]: '' }))
     runReview(
       articleId,
       task,
       model,
-      (chunk) => setStreaming((s) => ({ ...s, [task]: (s[task] || '') + chunk })),
+      (chunk) => setStreaming((s) => ({ ...s, [key]: (s[key] || '') + chunk })),
       undefined,
-      (err) => setStreaming((s) => ({ ...s, [task]: (s[task] || '') + `\n[Error: ${err}]` }))
+      (err) => setStreaming((s) => ({ ...s, [key]: (s[key] || '') + `\n[Error: ${err}]` })),
+      task === 2 ? task2Depth : undefined,
     )
       .then(() => {
         setLoadingTask(null)
@@ -166,6 +184,38 @@ export default function ArticleDrawer({ article, articleId, onClose, onRefetch }
                   </div>
                 </div>
               )}
+              {(article.year != null || article.venue_type || article.venue_name) && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Publication</p>
+                  <p className="text-[13px] text-slate-700">
+                    {[article.year, article.venue_type, article.venue_name].filter(Boolean).join(' · ') || '—'}
+                  </p>
+                </div>
+              )}
+              {article.links_json && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Extracted links</p>
+                  <ul className="text-[12px] text-blue-600 space-y-1 break-all">
+                    {(() => {
+                      try {
+                        const arr = JSON.parse(article.links_json!) as Array<{ url: string; kind?: string }>
+                        return Array.isArray(arr)
+                          ? arr.slice(0, 20).map((l, i) => (
+                              <li key={i}>
+                                <a href={l.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                  {l.kind ? `[${l.kind}] ` : ''}
+                                  {l.url}
+                                </a>
+                              </li>
+                            ))
+                          : null
+                      } catch {
+                        return null
+                      }
+                    })()}
+                  </ul>
+                </div>
+              )}
               {article.abstract && (
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Abstract</p>
@@ -200,13 +250,16 @@ export default function ArticleDrawer({ article, articleId, onClose, onRefetch }
               content={getStreamingOrCached(2)}
               loading={loadingTask === 2}
               onGenerate={() => handleGenerate(2)}
-              cachedList={getCachedForTask(2)}
+              cachedList={getCachedForTask(2, task2Depth)}
+              task2Depth={task2Depth}
+              onTask2DepthChange={setTask2Depth}
               modelSelect={{
                 models,
                 value: selectedModel[2] || defaultModels.task2,
                 onChange: (v) => setSelectedModel((s) => ({ ...s, 2: v })),
               }}
               renderMarkdown
+              citationArticle={{ id: articleId, title: article.title, pdf_path: article.pdf_path }}
             />
           )}
           {tab === 'task3' && (
@@ -221,6 +274,8 @@ export default function ArticleDrawer({ article, articleId, onClose, onRefetch }
                 value: selectedModel[3] || defaultModels.task3,
                 onChange: (v) => setSelectedModel((s) => ({ ...s, 3: v })),
               }}
+              renderMarkdown
+              citationArticle={{ id: articleId, title: article.title, pdf_path: article.pdf_path }}
             />
           )}
         </div>
@@ -397,6 +452,9 @@ function ReviewTab({
   modelSelect,
   renderJson,
   renderMarkdown,
+  task2Depth,
+  onTask2DepthChange,
+  citationArticle,
 }: {
   task: number
   content: string
@@ -406,6 +464,9 @@ function ReviewTab({
   modelSelect: { models: Array<{ id: string }>; value: string; onChange: (v: string) => void }
   renderJson?: boolean
   renderMarkdown?: boolean
+  task2Depth?: Task2Depth
+  onTask2DepthChange?: (d: Task2Depth) => void
+  citationArticle?: { id: string; title: string | null; pdf_path: string | null }
 }) {
   let body: React.ReactNode = content
   if (renderJson && content) {
@@ -420,7 +481,13 @@ function ReviewTab({
       body = <pre className="text-[12px] whitespace-pre-wrap font-sans">{content}</pre>
     }
   } else if (renderMarkdown && content) {
-    body = <MarkdownContent content={content} />
+    body = (
+      <MarkdownContent
+        content={content}
+        citationRefPrefix="review"
+        citationArticles={citationArticle ? [citationArticle] : undefined}
+      />
+    )
   } else if (content) {
     body = <pre className="text-[13px] text-slate-700 whitespace-pre-wrap font-sans">{content}</pre>
   }
@@ -438,6 +505,17 @@ function ReviewTab({
             <option key={m.id} value={m.id}>{m.id}</option>
           ))}
         </select>
+        {task === 2 && task2Depth && onTask2DepthChange && (
+          <select
+            value={task2Depth}
+            onChange={(e) => onTask2DepthChange(e.target.value as Task2Depth)}
+            className="text-[12px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white"
+          >
+            <option value="one_line">1 line / section</option>
+            <option value="five_line">~5 lines / section</option>
+            <option value="detailed">Detailed</option>
+          </select>
+        )}
         <button
           onClick={onGenerate}
           disabled={loading}

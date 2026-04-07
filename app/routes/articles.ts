@@ -1,47 +1,191 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import { createHash } from "crypto";
+import * as XLSX from "xlsx";
 import {
   getArticles,
   getArticle,
+  getArticlesMeta,
   getReviews,
+  getReviewsForArticleIds,
   deleteArticle,
   upsertArticle,
   getSetting,
+  setSetting,
+  getArticlesExportRows,
   type ArticleFilters,
 } from "../db.js";
 import { parsePdfToXml } from "../lib/grobid.js";
+import { buildArticleRecordFromTei } from "../lib/teiMetadata.js";
+import { pickIntroSummaryLit } from "../lib/reviewPick.js";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 const router = Router();
 
-function extractMetadataFromXml(xml: string): { title: string; authors: string; abstract: string } {
-  const titleMatch = xml.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, "").trim() : "";
-  const authorMatches = xml.match(/<author[\s\S]*?<persName[^>]*>([\s\S]*?)<\/persName>/gi) || [];
-  const authors = JSON.stringify(
-    authorMatches.map((a) => {
-      const m = a.match(/<persName[^>]*>([\s\S]*?)<\/persName>/i);
-      return m ? m[1].replace(/<[^>]+>/g, "").trim() : "";
-    }).filter(Boolean)
-  );
-  const abstractMatch = xml.match(/<abstract[\s\S]*?>([\s\S]*?)<\/abstract>/i);
-  const abstract = abstractMatch
-    ? abstractMatch[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
-    : "";
-  return { title, authors, abstract };
-}
+router.get("/export", (_req: Request, res: Response) => {
+  const raw = _req.query.ids;
+  const ids = typeof raw === "string" ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const rows = getArticlesExportRows(ids.length > 0 ? ids : null);
+  const rowIds = rows.map((r) => r.id);
+  const allReviews = getReviewsForArticleIds(rowIds);
+  const reviewsByArticle = new Map<string, typeof allReviews>();
+  for (const rev of allReviews) {
+    const list = reviewsByArticle.get(rev.article_id) ?? [];
+    list.push(rev);
+    reviewsByArticle.set(rev.article_id, list);
+  }
+
+  const articleHeader = [
+    "Article ID (MD5)",
+    "Title",
+    "Authors (JSON array)",
+    "Year",
+    "Venue type",
+    "Venue name",
+    "Abstract",
+    "Intro & metadata (LLM)",
+    "Section summary (LLM)",
+    "Literature review (LLM)",
+    "PDF filename",
+    "Parsed at (ISO)",
+    "Links (JSON)",
+  ];
+  const articleAoa: (string | number | null)[][] = [
+    articleHeader,
+    ...rows.map((r) => {
+      const llm = pickIntroSummaryLit(reviewsByArticle.get(r.id) ?? []);
+      return [
+        r.id,
+        r.title ?? "",
+        r.authors ?? "",
+        r.year ?? "",
+        r.venue_type ?? "",
+        r.venue_name ?? "",
+        r.abstract ?? "",
+        llm.intro ?? "",
+        llm.summary ?? "",
+        llm.literature_review ?? "",
+        r.pdf_path ?? "",
+        r.parsed_at ?? "",
+        r.links_json ?? "",
+      ];
+    }),
+  ];
+  const wsArticles = XLSX.utils.aoa_to_sheet(articleAoa);
+  wsArticles["!cols"] = [
+    { wch: 34 },
+    { wch: 44 },
+    { wch: 28 },
+    { wch: 8 },
+    { wch: 14 },
+    { wch: 28 },
+    { wch: 56 },
+    { wch: 48 },
+    { wch: 48 },
+    { wch: 48 },
+    { wch: 28 },
+    { wch: 22 },
+    { wch: 40 },
+  ];
+
+  const linkRows: Array<{ article_id: string; url: string; kind: string }> = [];
+  for (const r of rows) {
+    if (!r.links_json) continue;
+    try {
+      const arr = JSON.parse(r.links_json) as Array<{ url?: string; kind?: string }>;
+      if (!Array.isArray(arr)) continue;
+      for (const L of arr) {
+        if (L?.url) linkRows.push({ article_id: r.id, url: L.url, kind: L.kind || "other" });
+      }
+    } catch {
+      /* skip */
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsArticles, "Articles");
+  if (linkRows.length > 0) {
+    const linkHeader = ["Article ID (MD5)", "URL", "Kind (dataset/code/other)"];
+    const linkAoa: string[][] = [
+      linkHeader,
+      ...linkRows.map((l) => [l.article_id, l.url, l.kind]),
+    ];
+    const wsLinks = XLSX.utils.aoa_to_sheet(linkAoa);
+    wsLinks["!cols"] = [{ wch: 34 }, { wch: 64 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, wsLinks, "Links");
+  }
+
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  const nowIso = new Date().toISOString();
+  const prevCount = Number.parseInt(getSetting("exports_count") || "0", 10);
+  setSetting("exports_last_at", nowIso);
+  setSetting("exports_last_scope", ids.length > 0 ? "selected" : "all");
+  setSetting("exports_last_rows", String(rows.length));
+  setSetting("exports_last_links_rows", String(linkRows.length));
+  setSetting("exports_count", String(Number.isFinite(prevCount) ? prevCount + 1 : 1));
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", 'attachment; filename="library-export.xlsx"');
+  res.send(Buffer.from(buf));
+});
 
 router.get("/", (req: Request, res: Response) => {
   const search = (req.query.search as string) || undefined;
   const sort = (req.query.sort as ArticleFilters["sort"]) || "parsed_at";
   const order = (req.query.order as ArticleFilters["order"]) || "desc";
-  const list = getArticles({ search, sort, order });
-  res.json(list);
+  const yearMin = req.query.year_min != null && req.query.year_min !== "" ? Number(req.query.year_min) : undefined;
+  const yearMax = req.query.year_max != null && req.query.year_max !== "" ? Number(req.query.year_max) : undefined;
+  const venue_type = (req.query.venue_type as string) || undefined;
+  const rawInc = req.query.include_xml;
+  const include_xml =
+    rawInc === undefined || rawInc === "" ? true : !["0", "false", "no"].includes(String(rawInc).toLowerCase());
+  const rawRev = req.query.include_reviews;
+  const includeReviews =
+    rawRev === "1" || String(rawRev).toLowerCase() === "true" || String(rawRev).toLowerCase() === "yes";
+
+  const list = getArticles({
+    search,
+    sort,
+    order,
+    year_min: Number.isFinite(yearMin) ? yearMin : undefined,
+    year_max: Number.isFinite(yearMax) ? yearMax : undefined,
+    venue_type,
+    include_xml,
+  });
+
+  if (!includeReviews || list.length === 0) {
+    res.json(list);
+    return;
+  }
+
+  const idList = list.map((a) => a.id);
+  const allReviews = getReviewsForArticleIds(idList);
+  const byArt = new Map<string, typeof allReviews>();
+  for (const rev of allReviews) {
+    const arr = byArt.get(rev.article_id) ?? [];
+    arr.push(rev);
+    byArt.set(rev.article_id, arr);
+  }
+
+  const merged = list.map((a) => {
+    const llm = pickIntroSummaryLit(byArt.get(a.id) ?? []);
+    return {
+      ...a,
+      llm_intro: llm.intro,
+      llm_summary: llm.summary,
+      llm_literature_review: llm.literature_review,
+    };
+  });
+  res.json(merged);
+});
+
+router.get("/meta", (req: Request, res: Response) => {
+  const raw = req.query.ids;
+  const idList = typeof raw === "string" ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  res.json(getArticlesMeta(idList));
 });
 
 router.get("/:id/xml", (req: Request, res: Response) => {
-  const article = getArticle(req.params.id);
+  const article = getArticle(String(req.params.id));
   if (!article || !article.xml) {
     res.status(404).json({ error: "Article or XML not found" });
     return;
@@ -50,18 +194,19 @@ router.get("/:id/xml", (req: Request, res: Response) => {
 });
 
 router.get("/:id", (req: Request, res: Response) => {
-  const article = getArticle(req.params.id);
+  const id = String(req.params.id);
+  const article = getArticle(id);
   if (!article) {
     res.status(404).json({ error: "Article not found" });
     return;
   }
-  const reviews = getReviews(req.params.id);
+  const reviews = getReviews(id);
   res.json({ ...article, reviews });
 });
 
 router.delete("/:id", (req: Request, res: Response) => {
   try {
-    deleteArticle(req.params.id);
+    deleteArticle(String(req.params.id));
     res.status(204).send();
   } catch {
     res.status(404).json({ error: "Article not found" });
@@ -90,23 +235,34 @@ router.post("/batch", upload.array("pdfs", 50), async (req: Request, res: Respon
     const file = files[i];
     send("progress", { current: i + 1, total: files.length, filename: file.originalname, status: "parsing" });
     try {
-      const xml = await parsePdfToXml(file.buffer, file.originalname, grobidUrl);
-      const { title, authors, abstract } = extractMetadataFromXml(xml);
       const id = createHash("md5").update(file.buffer).digest("hex");
+      const existing = getArticle(id);
+      if (existing?.xml) {
+        send("progress", {
+          current: i + 1,
+          total: files.length,
+          filename: file.originalname,
+          status: "done",
+          cached: true,
+        });
+        continue;
+      }
+
+      const xml = await parsePdfToXml(file.buffer, file.originalname, grobidUrl);
       const parsedAt = new Date().toISOString();
-      upsertArticle({
-        id,
-        title: title || null,
-        authors: authors !== "[]" ? authors : null,
-        abstract: abstract || null,
-        pdf_path: file.originalname,
-        xml,
-        parsed_at: parsedAt,
-      });
+      upsertArticle(
+        buildArticleRecordFromTei(xml, { id, pdf_path: file.originalname, parsed_at: parsedAt }),
+      );
       send("progress", { current: i + 1, total: files.length, filename: file.originalname, status: "done" });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Parse failed";
-      send("progress", { current: i + 1, total: files.length, filename: file.originalname, status: "error", error: message });
+      send("progress", {
+        current: i + 1,
+        total: files.length,
+        filename: file.originalname,
+        status: "error",
+        error: message,
+      });
     }
   }
 

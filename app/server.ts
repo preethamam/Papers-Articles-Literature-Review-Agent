@@ -11,6 +11,7 @@ import reviewsRouter from "./routes/reviews.js";
 import settingsRouter from "./routes/settings.js";
 import grobidRouter from "./routes/grobid.js";
 import modelsRouter from "./routes/models.js";
+import metaRouter from "./routes/meta.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -20,7 +21,6 @@ const app = express();
 app.use(express.json({ limit: "50mb" }));
 
 const publicDir = path.join(__dirname, "public");
-app.use(express.static(publicDir));
 
 app.use("/api/chat", chatRouter);
 app.use("/api/parse", parseRouter);
@@ -29,12 +29,15 @@ app.use("/api/reviews", reviewsRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/grobid", grobidRouter);
 app.use("/api/models", modelsRouter);
+app.use("/api/meta", metaRouter);
+
+app.use(express.static(publicDir));
 
 app.get("*", (_req, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
 });
 
-const PORT = 3456;
+const PORT = Number(process.env.PORT) || 3456;
 
 function start() {
   getDb();

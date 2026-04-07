@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss'
 
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
@@ -11,6 +12,10 @@ export default {
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
         'fade-in-up': 'fadeInUp 0.25s ease-out',
+        'gradient-shift': 'gradientShift 14s ease infinite',
+        float: 'float 6s ease-in-out infinite',
+        'fade-in-slow': 'fadeIn 1s ease-out forwards',
+        'slide-up': 'slideUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards',
       },
       keyframes: {
         fadeIn: {
@@ -19,6 +24,18 @@ export default {
         },
         fadeInUp: {
           from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        gradientShift: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(24px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
       },

@@ -48,18 +48,18 @@ export default function Settings() {
   return (
     <div className="p-8 max-w-2xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-          <SettingsIcon className="w-6 h-6 text-slate-500" />
+        <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight flex items-center gap-2">
+          <SettingsIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" />
           Settings
         </h1>
-        <p className="text-slate-500 text-sm mt-1">
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
           API keys and service configuration
         </p>
       </div>
 
       <div className="space-y-6">
-        <div className="bg-white rounded-2xl p-6 shadow-card border border-slate-100">
-          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800 mb-4">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-card border border-slate-100 dark:border-slate-800">
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-4">
             <Key className="w-4 h-4" /> OpenRouter API Key
           </h2>
           <div className="flex gap-2">
@@ -68,7 +68,7 @@ export default function Settings() {
               value={apiKeyValue}
               onChange={(e) => setApiKeyValue(e.target.value)}
               placeholder={settings.openrouter_api_key ? '••••••••' : 'sk-or-v1-...'}
-              className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
+              className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl text-[13px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-300"
             />
             <button
               type="button"
@@ -83,8 +83,8 @@ export default function Settings() {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-card border border-slate-100">
-          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800 mb-4">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-card border border-slate-100 dark:border-slate-800">
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-4">
             <Server className="w-4 h-4" /> GROBID
           </h2>
           <div className="flex items-center gap-3 flex-wrap">
@@ -93,7 +93,7 @@ export default function Settings() {
               value={settings.grobid_url ?? ''}
               onChange={(e) => setSettings((s) => ({ ...s, grobid_url: e.target.value }))}
               placeholder="http://localhost:8070"
-              className="flex-1 min-w-[200px] px-3 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="flex-1 min-w-[200px] px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl text-[13px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
             <div className="flex items-center gap-2">
               <span
@@ -106,18 +106,18 @@ export default function Settings() {
             <button
               type="button"
               onClick={handleStartGrobid}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-[12px] font-medium text-slate-700"
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-[12px] font-medium text-slate-700 dark:text-slate-200"
             >
               <Play className="w-3.5 h-3.5" /> Start with Docker
             </button>
           </div>
           <p className="text-[12px] text-slate-400 mt-2">
-            Run GROBID via Docker: <code className="bg-slate-100 px-1 rounded">docker run -d --name grobid -p 8070:8070 lfoppiano/grobid:0.8.1</code>
+            Run GROBID via Docker: <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded text-slate-800 dark:text-slate-200">docker run -d --name grobid -p 8070:8070 lfoppiano/grobid:0.8.1</code>
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-card border border-slate-100">
-          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800 mb-4">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-card border border-slate-100 dark:border-slate-800">
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-4">
             <Cpu className="w-4 h-4" /> Default models
           </h2>
           <div className="space-y-3">
@@ -126,7 +126,7 @@ export default function Settings() {
               <select
                 value={settings.default_model ?? 'openrouter/free'}
                 onChange={(e) => setSettings((s) => ({ ...s, default_model: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl text-[13px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 {models.slice(0, 80).map((m) => (
                   <option key={m.id} value={m.id}>{m.id}</option>
@@ -139,7 +139,7 @@ export default function Settings() {
               <select
                 value={settings.default_model_task1 ?? settings.default_model ?? 'openrouter/free'}
                 onChange={(e) => setSettings((s) => ({ ...s, default_model_task1: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl text-[13px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 {models.slice(0, 80).map((m) => (
                   <option key={m.id} value={m.id}>{m.id}</option>
@@ -152,7 +152,7 @@ export default function Settings() {
               <select
                 value={settings.default_model_task2 ?? settings.default_model ?? 'openrouter/free'}
                 onChange={(e) => setSettings((s) => ({ ...s, default_model_task2: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl text-[13px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 {models.slice(0, 80).map((m) => (
                   <option key={m.id} value={m.id}>{m.id}</option>
@@ -165,7 +165,7 @@ export default function Settings() {
               <select
                 value={settings.default_model_task3 ?? settings.default_model ?? 'openrouter/free'}
                 onChange={(e) => setSettings((s) => ({ ...s, default_model_task3: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-xl text-[13px] bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               >
                 {models.slice(0, 80).map((m) => (
                   <option key={m.id} value={m.id}>{m.id}</option>
