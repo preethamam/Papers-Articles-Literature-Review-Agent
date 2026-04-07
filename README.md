@@ -33,6 +33,7 @@ The installer will:
 
 - install npm dependencies for root, `app`, and `frontend`
 - create `.env` from `.env.example` if needed
+- optionally prompt for `OPENROUTER_API_KEY` and `GROBID_URL`
 - build the frontend into `app/public`
 
 ## Configure environment

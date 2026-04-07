@@ -42,6 +42,41 @@ else
   echo "-> .env already exists"
 fi
 
+echo ""
+read -r -p "Enter OPENROUTER_API_KEY now? [y/N]: " SET_KEY
+if [[ "${SET_KEY:-}" =~ ^[Yy]$ ]]; then
+  read -r -s -p "OPENROUTER_API_KEY: " OPENROUTER_KEY
+  echo ""
+  if [ -n "${OPENROUTER_KEY:-}" ]; then
+    # Replace existing key line if present; otherwise append once.
+    if grep -q "^OPENROUTER_API_KEY=" "$REPO_DIR/.env"; then
+      sed -i.bak "s|^OPENROUTER_API_KEY=.*$|OPENROUTER_API_KEY=$OPENROUTER_KEY|" "$REPO_DIR/.env"
+    else
+      printf "\nOPENROUTER_API_KEY=%s\n" "$OPENROUTER_KEY" >> "$REPO_DIR/.env"
+    fi
+    rm -f "$REPO_DIR/.env.bak"
+    echo "-> Saved OPENROUTER_API_KEY in .env"
+  else
+    echo "-> Empty key entered, skipping."
+  fi
+fi
+
+read -r -p "Set GROBID_URL now? [y/N]: " SET_GROBID
+if [[ "${SET_GROBID:-}" =~ ^[Yy]$ ]]; then
+  read -r -p "GROBID_URL (e.g. http://localhost:8070): " GROBID_VALUE
+  if [ -n "${GROBID_VALUE:-}" ]; then
+    if grep -q "^GROBID_URL=" "$REPO_DIR/.env"; then
+      sed -i.bak "s|^GROBID_URL=.*$|GROBID_URL=$GROBID_VALUE|" "$REPO_DIR/.env"
+    else
+      printf "\nGROBID_URL=%s\n" "$GROBID_VALUE" >> "$REPO_DIR/.env"
+    fi
+    rm -f "$REPO_DIR/.env.bak"
+    echo "-> Saved GROBID_URL in .env"
+  else
+    echo "-> Empty URL entered, skipping."
+  fi
+fi
+
 echo "-> Building frontend into app/public..."
 npm run build
 
@@ -50,7 +85,7 @@ echo "============================================================"
 echo "  Installation complete"
 echo "============================================================"
 echo "Next:"
-echo "  1) Edit .env and set OPENROUTER_API_KEY (+ optional GROBID_URL)"
+echo "  1) If needed, edit .env for OPENROUTER_API_KEY / GROBID_URL"
 echo "  2) Run app: npm start"
 echo "  3) For dev mode: npm run dev"
 echo ""
