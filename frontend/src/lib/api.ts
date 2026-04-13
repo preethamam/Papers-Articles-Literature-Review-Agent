@@ -317,7 +317,7 @@ export const getPaperAbstract = (_paperId: string, _forceRegenerate = false) =>
   Promise.reject(new Error('Use Review panel instead'))
 
 // ----- Chat (streaming) -----
-export type ChatMode = 'lit_review_synthesis' | 'summarize_set' | 'intro_abstract'
+export type ChatMode = 'lit_review_synthesis' | 'summarize_set' | 'intro_abstract' | 'related_work_compile'
 
 export function sendChat(
   message: string,
@@ -326,6 +326,7 @@ export function sendChat(
     system?: string
     articleIds?: string[]
     mode?: ChatMode
+    detailLevel?: 0 | 1 | 2 | 3
     files?: Array<{ name: string; type: string; text?: string; data?: string }>
   },
   onChunk: (content: string) => void,
@@ -341,6 +342,7 @@ export function sendChat(
       system: options.system,
       articleIds: options.articleIds?.length ? options.articleIds : undefined,
       mode: options.mode,
+      detailLevel: options.detailLevel ?? 0,
       files: options.files,
     }),
   }).then((res) => {

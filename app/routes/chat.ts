@@ -3,9 +3,10 @@ import { createOpenRouter } from "../lib/openrouter.js";
 import { getSetting } from "../db.js";
 import { buildArticleContextSystemBlock } from "../lib/chatArticleContext.js";
 import {
-  INTRO_ABSTRACT_CHAT_SYSTEM,
-  LITERATURE_SYNTHESIS_SYSTEM,
-  SUMMARIZE_SET_CHAT_SYSTEM,
+  getIntroAbstractChatSystem,
+  getLiteratureSynthesisSystem,
+  getRelatedWorkCompileSystem,
+  getSummarizeSetChatSystem,
 } from "../lib/prompts.js";
 import { validateCiteTargets } from "../lib/chatCiteGuard.js";
 
@@ -13,6 +14,9 @@ const router = Router();
 
 router.post("/", async (req: Request, res: Response) => {
   const { message, model, files, system, mode } = req.body;
+  const detailLevelRaw = Number(req.body.detailLevel);
+  const detailLevel: 0 | 1 | 2 | 3 =
+    detailLevelRaw >= 3 ? 3 : detailLevelRaw >= 2 ? 2 : detailLevelRaw === 1 ? 1 : 0;
   const articleIdsRaw = req.body.articleIds;
   const articleIds = Array.isArray(articleIdsRaw)
     ? articleIdsRaw.map((id: unknown) => String(id).trim()).filter(Boolean)
@@ -22,6 +26,10 @@ router.post("/", async (req: Request, res: Response) => {
 
   if (!message) {
     res.status(400).json({ error: "message is required" });
+    return;
+  }
+  if (mode === "related_work_compile" && (articleIds.length < 2 || articleIds.length > 50)) {
+    res.status(400).json({ error: "Related-work compilation requires selecting between 2 and 50 articles." });
     return;
   }
 
@@ -54,11 +62,13 @@ router.post("/", async (req: Request, res: Response) => {
   const docBlock = buildArticleContextSystemBlock(articleIds);
   const systemParts: string[] = [];
   if (mode === "lit_review_synthesis") {
-    systemParts.push(LITERATURE_SYNTHESIS_SYSTEM);
+    systemParts.push(getLiteratureSynthesisSystem(detailLevel));
   } else if (mode === "summarize_set") {
-    systemParts.push(SUMMARIZE_SET_CHAT_SYSTEM);
+    systemParts.push(getSummarizeSetChatSystem(detailLevel));
   } else if (mode === "intro_abstract") {
-    systemParts.push(INTRO_ABSTRACT_CHAT_SYSTEM);
+    systemParts.push(getIntroAbstractChatSystem(detailLevel));
+  } else if (mode === "related_work_compile") {
+    systemParts.push(getRelatedWorkCompileSystem(detailLevel));
   }
   if (typeof system === "string" && system.trim()) systemParts.push(system.trim());
   if (docBlock) systemParts.push(docBlock);

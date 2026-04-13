@@ -7,6 +7,25 @@ const proseClasses = 'prose prose-sm max-w-none text-slate-700 dark:text-slate-2
 
 export type CitationArticleRef = { id: string; title: string | null; pdf_path: string | null }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Turn `**Exact title**` into `[**Exact title**](cite:id)` for in-scope articles (longest titles first). */
+function linkifyBoldArticleTitles(content: string, articles: CitationArticleRef[]): string {
+  if (!articles.length) return content
+  const sorted = [...articles]
+    .filter((a) => a.title?.trim())
+    .sort((a, b) => (b.title!.length) - (a.title!.length))
+  let out = content
+  for (const a of sorted) {
+    const t = a.title!.trim()
+    const boldRe = new RegExp(`\\*\\*${escapeRegExp(t)}\\*\\*`, 'g')
+    out = out.replace(boldRe, `[**${t}**](cite:${a.id})`)
+  }
+  return out
+}
+
 function buildComponents(citationRefPrefix: string | undefined): Components {
   return {
     h1: ({ children }) => <h1 className="text-lg font-bold mt-4 mb-2 first:mt-0">{children}</h1>,
@@ -80,11 +99,15 @@ export default function MarkdownContent({
   citationArticles,
 }: Props) {
   const merged = components ?? buildComponents(citationRefPrefix)
+  const md =
+    citationArticles && citationArticles.length > 0 && citationRefPrefix
+      ? linkifyBoldArticleTitles(content, citationArticles)
+      : content
 
   return (
     <div className={`${proseClasses} ${className}`}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={merged}>
-        {content}
+        {md}
       </ReactMarkdown>
       {citationArticles && citationArticles.length > 0 && citationRefPrefix && (
         <div className="not-prose mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">

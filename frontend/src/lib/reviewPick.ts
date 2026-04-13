@@ -2,6 +2,9 @@ import type { Review } from '@/lib/api'
 
 const TASK2_DEPTH_ORDER = ['detailed', 'five_line', 'one_line', '']
 
+/** Prefer medium depth (five_line) for section summaries, then fall back. */
+const TASK2_MEDIUM_FIRST_ORDER = ['five_line', 'detailed', 'one_line', '']
+
 export function pickReviewText(reviews: Review[], task: number): { text: string; depth?: string } | null {
   const subset = reviews.filter((r) => r.task === task)
   if (subset.length === 0) return null
@@ -23,4 +26,21 @@ export function pickReviewText(reviews: Review[], task: number): { text: string;
   )
   const m = sorted[0]
   return m?.result?.trim() ? { text: m.result } : null
+}
+
+/**
+ * Task 2: prefer medium summary (five_line) for article views; falls back like pickReviewText.
+ */
+export function pickReviewTextMediumTask2(reviews: Review[]): { text: string; depth?: string } | null {
+  const subset = reviews.filter((r) => r.task === 2)
+  if (subset.length === 0) return null
+  for (const depth of TASK2_MEDIUM_FIRST_ORDER) {
+    const m = subset.find((r) => (r.review_depth || '') === depth)
+    if (m?.result?.trim()) return { text: m.result, depth: m.review_depth || depth || undefined }
+  }
+  const sorted = [...subset].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  )
+  const m = sorted[0]
+  return m?.result?.trim() ? { text: m.result, depth: m.review_depth || undefined } : null
 }

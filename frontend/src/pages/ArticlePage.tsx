@@ -1,10 +1,26 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Sparkles, BookOpen, Library } from 'lucide-react'
-import { getArticle } from '@/lib/api'
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  Sparkles,
+  BookOpen,
+  Library,
+  RefreshCw,
+} from 'lucide-react'
+import { getArticle, getModels, getSettings, runReview } from '@/lib/api'
 import type { ArticleWithReviews } from '@/lib/api'
-import MarkdownContent from '@/components/MarkdownContent'
-import { pickReviewText } from '@/lib/reviewPick'
+import MarkdownContent, { type CitationArticleRef } from '@/components/MarkdownContent'
+import { pickReviewText, pickReviewTextMediumTask2 } from '@/lib/reviewPick'
+import { extractIntroductionSectionFromTei, extractRelatedWorkSectionFromTei } from '@/lib/teiRelatedWork'
+
+type Task2Depth = 'one_line' | 'five_line' | 'detailed'
+
+function streamKey(task: 1 | 2 | 3, task2Depth: Task2Depth): string {
+  return task === 2 ? `2-${task2Depth}` : String(task)
+}
 
 function parseAuthorsJson(s: string | null): string[] {
   try {
@@ -30,20 +46,56 @@ function parseLinksJson(s: string | null): Array<{ url: string; kind?: string; n
   }
 }
 
-function LlmBlock({
+function renderTask1Body(text: string) {
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>
+    return (
+      <pre className="text-[12px] bg-slate-50 dark:bg-slate-800/80 p-4 rounded-xl overflow-auto max-h-96 text-slate-800 dark:text-slate-200">
+        {JSON.stringify(parsed, null, 2)}
+      </pre>
+    )
+  } catch {
+    return <MarkdownContent content={text} />
+  }
+}
+
+function LlmTaskCard({
   title,
   subtitle,
+  taskNum,
   picked,
-  emptyHint,
+  streamingText,
+  generating,
+  onGenerate,
+  models,
+  modelValue,
+  onModelChange,
+  task2Depth,
+  onTask2DepthChange,
+  citationArticle,
+  hasTeiXml,
 }: {
   title: string
   subtitle: string
+  taskNum: 1 | 2 | 3
   picked: { text: string; depth?: string } | null
-  emptyHint: string
+  streamingText: string
+  generating: boolean
+  onGenerate: () => void
+  models: Array<{ id: string }>
+  modelValue: string
+  onModelChange: (v: string) => void
+  task2Depth?: Task2Depth
+  onTask2DepthChange?: (d: Task2Depth) => void
+  citationArticle: CitationArticleRef
+  hasTeiXml: boolean
 }) {
+  const text = (streamingText || picked?.text || '').trim()
+  const showBody = text.length > 0
+
   return (
     <div className="rounded-xl border border-slate-200/90 dark:border-slate-700/90 bg-gradient-to-b from-white to-slate-50/80 dark:from-slate-900 dark:to-slate-900/80 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-2">
+      <div className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-2 flex-wrap">
         <div>
           <h3 className="text-[12px] font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-violet-500 shrink-0" />
@@ -51,15 +103,68 @@ function LlmBlock({
           </h3>
           <p className="text-[10px] text-slate-400 mt-0.5">{subtitle}</p>
         </div>
-        {picked?.depth && (
-          <span className="text-[10px] uppercase tracking-wide text-slate-400 shrink-0">{picked.depth}</span>
-        )}
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {picked?.depth && taskNum === 2 && (
+            <span className="text-[10px] uppercase tracking-wide text-slate-400 shrink-0">{picked.depth}</span>
+          )}
+          <select
+            value={modelValue}
+            onChange={(e) => onModelChange(e.target.value)}
+            className="text-[11px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 max-w-[200px]"
+          >
+            {models.length === 0 && <option value={modelValue}>{modelValue}</option>}
+            {models.slice(0, 50).map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.id}
+              </option>
+            ))}
+          </select>
+          {taskNum === 2 && task2Depth && onTask2DepthChange && (
+            <select
+              value={task2Depth}
+              onChange={(e) => onTask2DepthChange(e.target.value as Task2Depth)}
+              className="text-[11px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+            >
+              <option value="one_line">1 line / section</option>
+              <option value="five_line">~5 lines / section (medium)</option>
+              <option value="detailed">Detailed</option>
+            </select>
+          )}
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={generating || !hasTeiXml}
+            title={!hasTeiXml ? 'Parse the PDF first so TEI is available for the same prompts as the drawer.' : undefined}
+            className="inline-flex items-center gap-1.5 text-[11px] text-blue-600 dark:text-blue-400 hover:text-blue-700 disabled:opacity-50 px-2.5 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40"
+          >
+            {generating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            {generating ? 'Generating…' : showBody ? 'Regenerate' : 'Generate'}
+          </button>
+        </div>
       </div>
       <div className="px-4 py-3 text-[13px] min-h-[3rem]">
-        {picked?.text?.trim() ? (
-          <MarkdownContent content={picked.text} />
+        {!hasTeiXml && (
+          <p className="text-amber-700 dark:text-amber-400 text-[12px] mb-2">
+            Upload and parse this PDF on the Upload page so GROBID TEI is available — reviews use the same XML-backed
+            prompts as the library drawer.
+          </p>
+        )}
+        {showBody ? (
+          taskNum === 1 ? (
+            renderTask1Body(streamingText || picked?.text || '')
+          ) : (
+            <MarkdownContent
+              content={streamingText || picked?.text || ''}
+              citationRefPrefix={`article${taskNum}`}
+              citationArticles={[citationArticle]}
+            />
+          )
         ) : (
-          <p className="text-slate-400 dark:text-slate-500 text-[13px] leading-relaxed italic">{emptyHint}</p>
+          <p className="text-slate-400 dark:text-slate-500 text-[13px] leading-relaxed italic">
+            Not generated yet. Choose model
+            {taskNum === 2 ? ', section depth,' : ''} and Generate — same tasks and prompts as Settings → models and
+            the article drawer.
+          </p>
         )}
       </div>
     </div>
@@ -73,6 +178,37 @@ export default function ArticlePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [xmlOpen, setXmlOpen] = useState(false)
+
+  const [models, setModels] = useState<Array<{ id: string }>>([])
+  const [defaultModels, setDefaultModels] = useState({
+    task1: 'openrouter/free',
+    task2: 'openrouter/free',
+    task3: 'openrouter/free',
+  })
+  const [selectedModel, setSelectedModel] = useState<Partial<Record<1 | 2 | 3, string>>>({})
+  const [task2Depth, setTask2Depth] = useState<Task2Depth>('five_line')
+  const [genLoading, setGenLoading] = useState<1 | 2 | 3 | null>(null)
+  const [genStream, setGenStream] = useState<Record<string, string>>({})
+
+  const loadModelsAndDefaults = useCallback(() => {
+    getSettings().then((s) => {
+      setDefaultModels({
+        task1: s.default_model_task1 || s.default_model || 'openrouter/free',
+        task2: s.default_model_task2 || s.default_model || 'openrouter/free',
+        task3: s.default_model_task3 || s.default_model || 'openrouter/free',
+      })
+    })
+    getModels()
+      .then((r) => {
+        const list = (r as { data?: Array<{ id: string }> })?.data ?? []
+        setModels(Array.isArray(list) ? list : [])
+      })
+      .catch(() => setModels([]))
+  }, [])
+
+  useEffect(() => {
+    loadModelsAndDefaults()
+  }, [loadModelsAndDefaults])
 
   useEffect(() => {
     if (!id) {
@@ -91,14 +227,65 @@ export default function ArticlePage() {
   const reviews = article?.reviews ?? []
 
   const task1 = useMemo(() => pickReviewText(reviews, 1), [reviews])
-  const task2 = useMemo(() => pickReviewText(reviews, 2), [reviews])
+  /** Task 2: prefer cached row matching selected depth in UI; else medium fallback. */
+  const task2ForSelectedDepth = useMemo(() => {
+    const exact = reviews.find((r) => r.task === 2 && (r.review_depth || '') === task2Depth)
+    if (exact?.result?.trim()) return { text: exact.result, depth: exact.review_depth || task2Depth }
+    return pickReviewTextMediumTask2(reviews)
+  }, [reviews, task2Depth])
   const task3 = useMemo(() => pickReviewText(reviews, 3), [reviews])
+
+  const teiIntro = useMemo(
+    () => (article?.xml ? extractIntroductionSectionFromTei(article.xml) : null),
+    [article?.xml],
+  )
+  const teiRelatedWork = useMemo(
+    () => (article?.xml ? extractRelatedWorkSectionFromTei(article.xml) : null),
+    [article?.xml],
+  )
 
   const authorsList = article ? parseAuthorsJson(article.authors ?? null) : []
   const links = article ? parseLinksJson(article.links_json ?? null) : []
 
-  const emptyLlm =
-    'Not generated yet. Open this paper in the Library and run the matching action in the article drawer (models + Generate).'
+  const refetchArticle = useCallback(() => {
+    if (!id) return
+    getArticle(id).then(setArticle).catch(() => {})
+  }, [id])
+
+  const handleGenerate = useCallback(
+    (task: 1 | 2 | 3) => {
+      if (!id || !article) return
+      const model =
+        selectedModel[task] || defaultModels[`task${task}` as 'task1' | 'task2' | 'task3'] || 'openrouter/free'
+      const key = streamKey(task, task2Depth)
+      setGenLoading(task)
+      setGenStream((s) => ({ ...s, [key]: '' }))
+      runReview(
+        id,
+        task,
+        model,
+        (chunk) => setGenStream((s) => ({ ...s, [key]: (s[key] || '') + chunk })),
+        undefined,
+        (err) => setGenStream((s) => ({ ...s, [key]: (s[key] || '') + `\n[Error: ${err}]` })),
+        task === 2 ? task2Depth : undefined,
+      )
+        .then(() => {
+          setGenLoading(null)
+          setGenStream((s) => {
+            const next = { ...s }
+            delete next[key]
+            return next
+          })
+          refetchArticle()
+        })
+        .catch(() => setGenLoading(null))
+    },
+    [id, article, selectedModel, defaultModels, task2Depth, refetchArticle],
+  )
+
+  const citationArticle: CitationArticleRef = article
+    ? { id: article.id, title: article.title, pdf_path: article.pdf_path }
+    : { id: '', title: null, pdf_path: null }
 
   if (!id) {
     return (
@@ -190,13 +377,17 @@ export default function ArticlePage() {
             <h2 className="text-lg font-semibold tracking-tight">Article preview</h2>
           </div>
           <p className="text-[12px] text-slate-500 dark:text-slate-400 -mt-2">
-            TEI abstract and links; then intro, section summary, and literature review from cached LLM runs (same labels
-            as Excel export).
+            <strong className="text-slate-600 dark:text-slate-300">Extracted preview</strong> comes from GROBID TEI
+            (deterministic). <strong className="text-slate-600 dark:text-slate-300">LLM blocks</strong> use the same
+            backend tasks and prompts as the library drawer (<code className="text-[11px]">POST /api/reviews/:id</code>
+            ). Generate or regenerate inline below.
           </p>
 
           <div className="space-y-3">
             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Abstract</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                Abstract (extracted)
+              </p>
               {article.abstract?.trim() ? (
                 <p className="text-[13px] text-slate-700 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
                   {article.abstract}
@@ -205,6 +396,41 @@ export default function ArticlePage() {
                 <p className="text-slate-400 italic text-[13px]">No abstract extracted from TEI.</p>
               )}
             </div>
+
+            {teiIntro && (
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  Introduction (extracted preview)
+                </p>
+                <p className="text-[13px] text-slate-700 dark:text-slate-200 leading-relaxed line-clamp-[12]">
+                  {teiIntro}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-2">Truncated from TEI for preview; full text is in XML below.</p>
+              </div>
+            )}
+
+            {teiRelatedWork && (
+              <div className="rounded-xl border border-emerald-200/80 dark:border-emerald-800/80 bg-emerald-50/40 dark:bg-emerald-950/30 px-4 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-2">
+                  Related work (extracted from TEI)
+                </p>
+                <p className="text-[13px] text-slate-800 dark:text-slate-100 leading-relaxed line-clamp-[14]">
+                  {teiRelatedWork}
+                </p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-2">
+                  Parsed from the Related Work / Prior Work / Background section in GROBID output when present.
+                </p>
+              </div>
+            )}
+
+            {!teiRelatedWork && hasXml && (
+              <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-600 bg-slate-50/30 dark:bg-slate-900/30 px-4 py-2.5">
+                <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                  No separate &quot;Related work&quot; section detected in TEI (heading may differ or section may be
+                  merged). Use Task 3 LLM below or inspect full XML.
+                </p>
+              </div>
+            )}
 
             {links.length > 0 && (
               <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 px-4 py-3">
@@ -230,25 +456,56 @@ export default function ArticlePage() {
               </div>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-1">
-              <LlmBlock
-                title="Intro & metadata"
-                subtitle="Task 1 — overview, links, and structured metadata from the model"
-                picked={task1}
-                emptyHint={emptyLlm}
-              />
-              <LlmBlock
-                title="Section summary"
-                subtitle="Task 2 — paper walkthrough (depth preference: detailed → five-line → one-line)"
-                picked={task2}
-                emptyHint={emptyLlm}
-              />
-              <LlmBlock
-                title="Literature review"
-                subtitle="Task 3 — related work and positioning"
-                picked={task3}
-                emptyHint={emptyLlm}
-              />
+            <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700">
+              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">
+                LLM outputs (same prompts as drawer)
+              </p>
+              <div className="grid gap-4 sm:grid-cols-1">
+                <LlmTaskCard
+                  taskNum={1}
+                  title="Intro + metadata"
+                  subtitle="Task 1 — JSON metadata, links, and context (PAPER_REVIEW option 1)"
+                  picked={task1}
+                  streamingText={genStream['1'] ?? ''}
+                  generating={genLoading === 1}
+                  onGenerate={() => handleGenerate(1)}
+                  models={models}
+                  modelValue={selectedModel[1] ?? defaultModels.task1}
+                  onModelChange={(v) => setSelectedModel((s) => ({ ...s, 1: v }))}
+                  citationArticle={citationArticle}
+                  hasTeiXml={hasXml}
+                />
+                <LlmTaskCard
+                  taskNum={2}
+                  title="Section summary"
+                  subtitle="Task 2 — section-by-section summary; default depth matches “medium” (~5 lines / section)"
+                  picked={task2ForSelectedDepth}
+                  streamingText={genStream[streamKey(2, task2Depth)] ?? ''}
+                  generating={genLoading === 2}
+                  onGenerate={() => handleGenerate(2)}
+                  models={models}
+                  modelValue={selectedModel[2] ?? defaultModels.task2}
+                  onModelChange={(v) => setSelectedModel((s) => ({ ...s, 2: v }))}
+                  task2Depth={task2Depth}
+                  onTask2DepthChange={setTask2Depth}
+                  citationArticle={citationArticle}
+                  hasTeiXml={hasXml}
+                />
+                <LlmTaskCard
+                  taskNum={3}
+                  title="Literature review / related work"
+                  subtitle="Task 3 — related work synthesis vs TEI (PAPER_REVIEW option 3)"
+                  picked={task3}
+                  streamingText={genStream['3'] ?? ''}
+                  generating={genLoading === 3}
+                  onGenerate={() => handleGenerate(3)}
+                  models={models}
+                  modelValue={selectedModel[3] ?? defaultModels.task3}
+                  onModelChange={(v) => setSelectedModel((s) => ({ ...s, 3: v }))}
+                  citationArticle={citationArticle}
+                  hasTeiXml={hasXml}
+                />
+              </div>
             </div>
           </div>
         </div>

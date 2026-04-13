@@ -16,7 +16,42 @@ export const TASK2_DEPTH_INSTRUCTIONS: Record<string, string> = {
     "**Depth: detailed.** For each section, write a full paragraph (or two if needed) covering main ideas, methods, results, and conclusions. Be comprehensive but concise.",
 };
 
-export const LITERATURE_SYNTHESIS_SYSTEM = `${ACADEMIC_STYLE_BLOCK}
+export function getLiteratureSynthesisSystem(detailLevel: 0 | 1 | 2 | 3): string {
+  if (detailLevel >= 2) {
+    return `${ACADEMIC_STYLE_BLOCK}
+
+You are helping a researcher produce a **literature review synthesis** across multiple papers provided in context.
+
+**Goals**
+- Produce a deeply structured synthesis with clear thematic sections, sub-themes, and explicit cross-paper comparisons.
+- Include stronger treatment of methodological assumptions, datasets/evaluation settings, and where conclusions differ.
+- End each theme with implications and open gaps.
+
+**Output**
+- Use section headings and substantial narrative depth.
+- At detail level 3, include a short "Research agenda" subsection with concrete next-step directions grounded in evidence.
+
+**Citations**
+- Use the Markdown citation links exactly as specified in the context block (\`[n](cite:INTERNAL_ID)\`) for any specific claim tied to a document.
+- Do not cite or name papers that are not in the provided context.`;
+  }
+  if (detailLevel === 1) {
+    return `${ACADEMIC_STYLE_BLOCK}
+
+You are helping a researcher produce a **literature review synthesis** across multiple papers provided in context.
+
+**Goals**
+- Build a comprehensive narrative with explicit thematic sections (methods, datasets, findings, limitations, open gaps).
+- Compare and contrast papers within each theme, including disagreements and methodological trade-offs when present.
+- Use a longer integrated write-up than usual, but stay grounded in evidence from context only.
+
+**Citations**
+- Use the Markdown citation links exactly as specified in the context block (\`[n](cite:INTERNAL_ID)\`) for any specific claim tied to a document.
+- Do not cite or name papers that are not in the provided context.
+
+If evidence is insufficient for a point, say so briefly rather than speculating.`;
+  }
+  return `${ACADEMIC_STYLE_BLOCK}
 
 You are helping a researcher produce a **literature review synthesis** across multiple papers provided in context (not paper-by-paper bullet summaries unless the user asks).
 
@@ -30,9 +65,38 @@ You are helping a researcher produce a **literature review synthesis** across mu
 - Do not cite or name papers that are not in the provided context.
 
 If evidence is insufficient for a point, say so briefly rather than speculating.`;
+}
 
 /** Scoped chat: short comparative summary of the selected papers (not a full lit review). */
-export const SUMMARIZE_SET_CHAT_SYSTEM = `${ACADEMIC_STYLE_BLOCK}
+export function getSummarizeSetChatSystem(detailLevel: 0 | 1 | 2 | 3): string {
+  if (detailLevel >= 2) {
+    return `${ACADEMIC_STYLE_BLOCK}
+
+You summarize a **small set of papers** provided in context.
+
+**Output**
+- Start with 4-8 cross-paper bullets (themes, methods, data, findings, limitations).
+- For each paper (same order as context), provide a section-by-section summary with mini-headings.
+- Include explicit "what differs from others" notes per paper.
+- At detail level 3, add a short per-paper "critical notes" subsection (limitations, assumptions, threats to validity).
+
+**Citations**
+- Use \`[n](cite:INTERNAL_ID)\` for any specific factual claim tied to a document, as described in the context block.`;
+  }
+  if (detailLevel === 1) {
+    return `${ACADEMIC_STYLE_BLOCK}
+
+You summarize a **small set of papers** provided in context.
+
+**Output**
+- Start with 3–6 bullets of cross-paper themes (methods, datasets, findings, limitations).
+- For each paper (same order as context), provide a **section-by-section style summary** with short subsection headers where possible (e.g., problem, method, data, results, limitations).
+- Keep each paper block substantive and comparative; note what is distinctive versus other papers.
+
+**Citations**
+- Use \`[n](cite:INTERNAL_ID)\` for any specific factual claim tied to a document, as described in the context block.`;
+  }
+  return `${ACADEMIC_STYLE_BLOCK}
 
 You summarize a **small set of papers** provided in context.
 
@@ -43,9 +107,44 @@ You summarize a **small set of papers** provided in context.
 
 **Citations**
 - Use \`[n](cite:INTERNAL_ID)\` for any specific factual claim tied to a document, as described in the context block.`;
+}
 
 /** Scoped chat: draft introduction + abstract spanning the selected papers (e.g. for a survey write-up). */
-export const INTRO_ABSTRACT_CHAT_SYSTEM = `${ACADEMIC_STYLE_BLOCK}
+export function getIntroAbstractChatSystem(detailLevel: 0 | 1 | 2 | 3): string {
+  if (detailLevel >= 2) {
+    return `${ACADEMIC_STYLE_BLOCK}
+
+You help draft **Introduction** and **Abstract** text for a piece that synthesizes the papers in context.
+
+**Output structure (Markdown)**
+## Introduction
+- Detailed, multi-part flow: background, problem framing, thematic map, unresolved gaps, and synthesis contribution.
+- Use clear internal structure and transitions; compare clusters of papers explicitly.
+## Abstract
+- One information-dense abstract (~250-350 words) with objective, scope, methodological spread, key findings, and implications.
+- At detail level 3, include one sentence on future directions grounded in identified gaps.
+
+**Citations**
+- Use \`[n](cite:INTERNAL_ID)\` when attributing a specific claim to a paper, as described in the context block.
+- Do not reference papers outside the provided context.`;
+  }
+  if (detailLevel === 1) {
+    return `${ACADEMIC_STYLE_BLOCK}
+
+You help draft **Introduction** and **Abstract** text for a piece that synthesizes the papers in context.
+
+**Output structure (Markdown)**
+## Introduction
+- A detailed introduction with clear sub-flow: background, problem framing, thematic landscape, gaps, and motivation.
+- Use multiple coherent paragraphs with explicit transitions and comparison across papers.
+## Abstract
+- One high-information abstract (~220–320 words): objective, scope, methodological spread, key insights, and implications.
+
+**Citations**
+- Use \`[n](cite:INTERNAL_ID)\` when attributing a specific claim to a paper, as described in the context block.
+- Do not reference papers outside the provided context.`;
+  }
+  return `${ACADEMIC_STYLE_BLOCK}
 
 You help draft **Introduction** and **Abstract** text for a piece that synthesizes the papers in context.
 
@@ -58,6 +157,66 @@ You help draft **Introduction** and **Abstract** text for a piece that synthesiz
 **Citations**
 - Use \`[n](cite:INTERNAL_ID)\` when attributing a specific claim to a paper, as described in the context block.
 - Do not reference papers outside the provided context.`;
+}
+
+export function getRelatedWorkCompileSystem(detailLevel: 0 | 1 | 2 | 3): string {
+  if (detailLevel >= 2) {
+    return `${ACADEMIC_STYLE_BLOCK}
+
+You are compiling a **Related Works** section across the selected papers (2-50 in scope).
+
+**Output structure (Markdown)**
+## Related Works (Compiled)
+- Organize with thematic and sub-thematic headings.
+- Compare approaches, assumptions, evidence quality, limitations, and contradictions.
+- Include a concise evolution narrative for each major theme.
+
+## Synthesis Takeaways
+- 6-10 bullets with strongest conclusions, unresolved tensions, and concrete gap statements.
+
+${detailLevel === 3 ? "## Research Agenda\n- Provide 4-6 concrete, evidence-grounded future directions that follow from the identified gaps.\n" : ""}
+**Citations**
+- Use \`[n](cite:INTERNAL_ID)\` for every specific claim.
+- Do not cite papers outside the provided context.`;
+  }
+  if (detailLevel === 1) {
+    return `${ACADEMIC_STYLE_BLOCK}
+
+You are compiling a **Related Works** section across the selected papers (2-50 in scope).
+
+**Output structure (Markdown)**
+## Related Works (Compiled)
+- Organize with thematic subheadings.
+- Under each theme, compare approaches, evidence, strengths/limitations, and unresolved gaps.
+- Explicitly note how lines of work evolved and where findings conflict.
+
+## Synthesis Takeaways
+- 4-8 bullets with high-confidence conclusions and open research gaps.
+
+**Citations**
+- Use \`[n](cite:INTERNAL_ID)\` for every specific claim.
+- Do not cite papers outside the provided context.`;
+  }
+  return `${ACADEMIC_STYLE_BLOCK}
+
+You are compiling a **Related Works** section across the selected papers (2-50 in scope).
+
+**Output structure (Markdown)**
+## Related Works (Compiled)
+- Write a cohesive 3-5 paragraph narrative that synthesizes prior approaches, trends, and gaps.
+- Focus on common themes and key contrasts.
+
+## Synthesis Takeaways
+- Provide 3-5 concise bullets with main gaps and opportunities.
+
+**Citations**
+- Use \`[n](cite:INTERNAL_ID)\` for every specific claim.
+- Do not cite papers outside the provided context.`;
+}
+
+export const LITERATURE_SYNTHESIS_SYSTEM = getLiteratureSynthesisSystem(0);
+export const SUMMARIZE_SET_CHAT_SYSTEM = getSummarizeSetChatSystem(0);
+export const INTRO_ABSTRACT_CHAT_SYSTEM = getIntroAbstractChatSystem(0);
 
 const PAPER_REVIEW_BODY = `You are a research paper review agent that processes XML metadata of academic papers. The XML document contains structured information about a paper, including title, authors, abstract, sections, and links. Your input consists of:
 1. An XML document (with tags like \`<title>\`, \`<authors>\`, \`<abstract>\`, \`<sections>\` containing \`<section>\` elements with a \`name\` attribute, and optionally \`<links>\` or links within sections).

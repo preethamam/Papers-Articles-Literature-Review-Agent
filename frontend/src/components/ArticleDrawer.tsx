@@ -31,7 +31,8 @@ function streamKey(task: number, task2Depth: Task2Depth): string {
 export default function ArticleDrawer({ article, articleId, onClose, onRefetch }: Props) {
   const [tab, setTab] = useState<Tab>('extracted')
   const [streaming, setStreaming] = useState<Record<string, string>>({})
-  const [task2Depth, setTask2Depth] = useState<Task2Depth>('detailed')
+  /** Default to medium (five_line) so it matches article page “medium detail” summary. */
+  const [task2Depth, setTask2Depth] = useState<Task2Depth>('five_line')
   const [loadingTask, setLoadingTask] = useState<number | null>(null)
   const [selectedModel, setSelectedModel] = useState<Record<number, string>>({})
   const [models, setModels] = useState<Array<{ id: string }>>([])

@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import {
   Send,
   StopCircle,
@@ -22,6 +22,7 @@ const LIT_REVIEW_PROMPT = `Write a literature review synthesis that integrates t
 const SUMMARIZE_USER_PROMPT = `Summarize the selected papers using the structure defined in your instructions (cross-paper bullets, then a short paragraph per paper).`
 
 const INTRO_ABSTRACT_USER_PROMPT = `Draft the Introduction and Abstract sections in Markdown as specified in your instructions.`
+const RELATED_WORK_COMPILE_PROMPT = `Compile a Related Works section from the selected papers. Synthesize major prior approaches, contrasts, and gaps into one coherent output with citations.`
 
 /** Dedupes React Strict Mode double-effect when opening /query?...&gen= */
 const autoGenConsumed = new Set<string>()
@@ -97,10 +98,30 @@ function MessageBubble({
         {sources && sources.length > 0 && (
           <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Sources</p>
-            {sources.map((s: { title: string; year?: number; chunk: string; relevance?: number }, i: number) => (
+            {sources.map(
+              (
+                s: {
+                  title: string
+                  year?: number
+                  chunk: string
+                  relevance?: number
+                  paper_id?: string
+                },
+                i: number,
+              ) => (
               <div key={i} className="text-[12px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/80 rounded-lg p-2.5">
                 <p className="font-medium text-slate-700 dark:text-slate-200 truncate">
-                  {s.title} {s.year ? `(${s.year})` : ''}
+                  {s.paper_id ? (
+                    <Link
+                      to={`/library/article/${encodeURIComponent(s.paper_id)}`}
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {s.title}
+                    </Link>
+                  ) : (
+                    s.title
+                  )}{' '}
+                  {s.year ? `(${s.year})` : ''}
                 </p>
                 <p className="line-clamp-2 mt-0.5">{s.chunk}</p>
                 {s.relevance != null && (
@@ -125,6 +146,9 @@ export default function Query() {
   const [input, setInput] = useState('')
   const [scopeMeta, setScopeMeta] = useState<ArticleMeta[]>([])
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
+  const [detailLevel, setDetailLevel] = useState<0 | 1 | 2 | 3>(0)
+  const detailLabel =
+    detailLevel === 0 ? '0 concise' : detailLevel === 1 ? '1 standard' : detailLevel === 2 ? '2 detailed' : '3 very detailed'
   const bottomRef = useRef<HTMLDivElement>(null)
   const { chatHistory, clearChat } = useAppStore()
   const { sendMessage, isStreaming, stop } = useStreamQuery()
@@ -171,33 +195,40 @@ export default function Query() {
     )
 
     if (gen === 'introabs') {
-      sendRef.current(INTRO_ABSTRACT_USER_PROMPT, { articleIds, mode: 'intro_abstract' })
+      sendRef.current(INTRO_ABSTRACT_USER_PROMPT, { articleIds, mode: 'intro_abstract', detailLevel })
     } else if (gen === 'summarize') {
-      sendRef.current(SUMMARIZE_USER_PROMPT, { articleIds, mode: 'summarize_set' })
+      sendRef.current(SUMMARIZE_USER_PROMPT, { articleIds, mode: 'summarize_set', detailLevel })
     } else if (gen === 'litreview') {
-      sendRef.current(LIT_REVIEW_PROMPT, { articleIds, mode: 'lit_review_synthesis' })
+      sendRef.current(LIT_REVIEW_PROMPT, { articleIds, mode: 'lit_review_synthesis', detailLevel })
+    } else if (gen === 'relatedwork') {
+      sendRef.current(RELATED_WORK_COMPILE_PROMPT, { articleIds, mode: 'related_work_compile', detailLevel })
     }
-  }, [articleIds, articleIdsKey, isStreaming, searchParams, setSearchParams])
+  }, [articleIds, articleIdsKey, detailLevel, isStreaming, searchParams, setSearchParams])
 
   const handleSend = () => {
     if (!input.trim() || isStreaming) return
-    sendMessage(input.trim(), { articleIds: articleIds.length ? articleIds : undefined })
+    sendMessage(input.trim(), { articleIds: articleIds.length ? articleIds : undefined, detailLevel })
     setInput('')
   }
 
   const runLitReview = () => {
     if (articleIds.length === 0 || isStreaming) return
-    sendMessage(LIT_REVIEW_PROMPT, { articleIds, mode: 'lit_review_synthesis' })
+    sendMessage(LIT_REVIEW_PROMPT, { articleIds, mode: 'lit_review_synthesis', detailLevel })
   }
 
   const runSummarize = () => {
     if (articleIds.length === 0 || isStreaming) return
-    sendMessage(SUMMARIZE_USER_PROMPT, { articleIds, mode: 'summarize_set' })
+    sendMessage(SUMMARIZE_USER_PROMPT, { articleIds, mode: 'summarize_set', detailLevel })
   }
 
   const runIntroAbstract = () => {
     if (articleIds.length === 0 || isStreaming) return
-    sendMessage(INTRO_ABSTRACT_USER_PROMPT, { articleIds, mode: 'intro_abstract' })
+    sendMessage(INTRO_ABSTRACT_USER_PROMPT, { articleIds, mode: 'intro_abstract', detailLevel })
+  }
+
+  const runRelatedWorkCompile = () => {
+    if (articleIds.length < 2 || articleIds.length > 50 || isStreaming) return
+    sendMessage(RELATED_WORK_COMPILE_PROMPT, { articleIds, mode: 'related_work_compile', detailLevel })
   }
 
   const clearScope = () => {
@@ -258,6 +289,33 @@ export default function Query() {
                   <BookMarked className="w-3.5 h-3.5" />
                   Literature review
                 </button>
+                <button
+                  type="button"
+                  onClick={runRelatedWorkCompile}
+                  disabled={isStreaming || articleIds.length < 2 || articleIds.length > 50}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[12px] font-medium bg-fuchsia-600 text-white hover:bg-fuchsia-700 disabled:opacity-50"
+                >
+                  <BookMarked className="w-3.5 h-3.5" />
+                  Compile related works
+                </button>
+                <div className="inline-flex items-center gap-2 px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">Detail</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={3}
+                    step={1}
+                    value={detailLevel}
+                    onChange={(e) => {
+                      const n = Number(e.target.value)
+                      setDetailLevel(n >= 3 ? 3 : n >= 2 ? 2 : n === 1 ? 1 : 0)
+                    }}
+                    className="w-24"
+                  />
+                  <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                    {detailLabel}
+                  </span>
+                </div>
                 <button type="button" onClick={clearScope} className="text-[12px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
                   Clear scope
                 </button>
@@ -272,13 +330,26 @@ export default function Query() {
           </div>
         </div>
         {scopeMeta.length > 0 && (
-          <ul className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
-            {scopeMeta.map((a) => (
-              <li key={a.id} className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 truncate max-w-[200px]" title={a.title ?? a.id}>
-                {a.title || a.pdf_path || a.id}
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+              {scopeMeta.map((a) => (
+                <li key={a.id} className="max-w-[min(100%,280px)]">
+                  <Link
+                    to={`/library/article/${encodeURIComponent(a.id)}`}
+                    className="inline-block px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 truncate max-w-full text-blue-700 dark:text-blue-300 hover:underline hover:bg-slate-200/80 dark:hover:bg-slate-700/80"
+                    title={a.title ?? a.id}
+                  >
+                    {a.title || a.pdf_path || a.id}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {(articleIds.length < 2 || articleIds.length > 50) && (
+              <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+                Compiled related works requires selecting between 2 and 50 articles.
+              </p>
+            )}
+          </>
         )}
       </div>
 

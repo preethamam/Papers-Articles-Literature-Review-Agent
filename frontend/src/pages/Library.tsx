@@ -133,6 +133,16 @@ export default function Library() {
               </button>
               <button
                 type="button"
+                onClick={() => navigate(queryWithGen(selectedIds, 'relatedwork'))}
+                disabled={selectedIds.length < 2 || selectedIds.length > 50}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium bg-fuchsia-600 text-white hover:bg-fuchsia-700 disabled:opacity-50"
+                title="Requires 2-50 selected papers"
+              >
+                <BookMarked className="w-3.5 h-3.5" />
+                Compile related works
+              </button>
+              <button
+                type="button"
                 onClick={() => navigate(queryWithGen(selectedIds, 'introabs'))}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium bg-violet-600 text-white hover:bg-violet-700"
               >
@@ -146,6 +156,11 @@ export default function Library() {
               >
                 Clear selection
               </button>
+              {(selectedIds.length < 2 || selectedIds.length > 50) && (
+                <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                  Compile related works requires 2-50 selected papers.
+                </span>
+              )}
             </div>
           )}
         </div>

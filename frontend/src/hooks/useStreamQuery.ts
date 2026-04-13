@@ -6,6 +6,7 @@ export type StreamQueryOptions = {
   model?: string
   articleIds?: string[]
   mode?: ChatMode
+  detailLevel?: 0 | 1 | 2 | 3
 }
 
 export function useStreamQuery() {
@@ -27,6 +28,7 @@ export function useStreamQuery() {
         model: opts?.model,
         articleIds: opts?.articleIds,
         mode: opts?.mode,
+        detailLevel: opts?.detailLevel ?? 0,
       },
       (chunk) => {
         if (!abortRef.current) updateLastAssistant(chunk)

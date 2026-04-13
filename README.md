@@ -1,83 +1,94 @@
 # Lit Review Agent v2
 
-Local-first literature review assistant with:
+Local-first literature review assistant for PDF ingestion, TEI parsing, article review generation, and multi-paper chat.
 
-- PDF parsing through GROBID
-- TEI metadata extraction (title, authors, abstract, venue, links)
-- Cached LLM workflows (intro/metadata, section summary, literature review)
-- Multi-paper chat and citations
-- Metadata explorer + Excel export
+## Quick Start (Copy/Paste)
 
-## Stack
-
-- `frontend/`: React + Vite + Tailwind
-- `app/`: Express + TypeScript + SQLite (`better-sqlite3`)
-- Local DB path: `~/.litreview/data.db`
-
-## Prerequisites
-
-- Node.js 20+ (Node 22 recommended)
-- npm 10+
-- GROBID running locally or reachable on your network
-- OpenRouter API key
-
-## Install from GitHub
+### 1) Clone and install
 
 ```bash
-git clone https://github.com/<your-user>/<your-repo>.git
-cd "<your-repo>"
+git clone git@github.com:preethamam/Papers-Articles-Introduction-Assimilator-Synthesizer.git
+cd "Papers-Articles-Introduction-Assimilator-Synthesizer"
 bash install.sh
 ```
 
-The installer will:
+### 2) Set environment variables
 
-- install npm dependencies for root, `app`, and `frontend`
-- create `.env` from `.env.example` if needed
-- optionally prompt for `OPENROUTER_API_KEY` and `GROBID_URL`
-- build the frontend into `app/public`
-
-For easiest onboarding, keep `GROBID_URL` as `http://localhost:8070` and use **Settings -> GROBID -> Docker managed -> Start with Docker** after first launch.
-
-## Configure environment
-
-Edit `.env`:
+Create or edit `.env` in the project root:
 
 ```env
 OPENROUTER_API_KEY=sk-or-v1-...
 GROBID_URL=http://localhost:8070
 ```
 
-## Run
+### 3) Start GROBID with Docker
 
-Production-style single server:
+Make sure Docker Desktop is running, then:
 
 ```bash
-npm start
+docker run --rm -it -p 8070:8070 --name grobid lfoppiano/grobid:0.8.0
 ```
 
-Dev mode (frontend HMR + backend):
+If you prefer detached mode:
+
+```bash
+docker run -d -p 8070:8070 --name grobid lfoppiano/grobid:0.8.0
+```
+
+### 4) Start the app
 
 ```bash
 npm run dev
 ```
 
-- Frontend dev URL: `http://localhost:5174`
-- Backend URL: `http://localhost:3456`
+Then open:
 
-## Common scripts
+- Frontend: `http://localhost:5174`
+- Backend API: `http://localhost:3456`
+
+## One-Command Run (production style)
 
 ```bash
-npm run dev        # backend + frontend
-npm run build      # build frontend to app/public
-npm start          # run express app
+npm start
 ```
 
-## Notes for end users
+This serves the built frontend from the Express server.
 
-- GROBID mode is configurable in Settings:
-  - `Docker managed`: app can start/reuse a local `grobid` container.
-  - `External URL`: app connects to your own GROBID server URL.
-- Export metadata is tracked in DB settings (last export timestamp/count/scope).
+## What `install.sh` does
+
+- Installs dependencies for root, `app`, and `frontend`
+- Creates `.env` from `.env.example` if missing
+- Builds the frontend into `app/public`
+
+## Useful commands
+
+```bash
+npm run dev       # backend + frontend (recommended for local development)
+npm run build     # compile frontend and output to app/public
+npm start         # run express server with built frontend
+```
+
+## GROBID notes
+
+- Default URL expected by the app: `http://localhost:8070`
+- You can also manage GROBID from the app UI: `Settings -> GROBID`
+- To stop detached container:
+
+```bash
+docker stop grobid
+```
+
+## Troubleshooting
+
+- **Docker command not found**: install Docker Desktop and restart terminal.
+- **Port 8070 already in use**: stop the existing service or map another port and update `GROBID_URL`.
+- **OpenRouter errors**: verify `OPENROUTER_API_KEY` in `.env` and restart app.
+
+## Stack
+
+- `frontend/`: React + Vite + Tailwind
+- `app/`: Express + TypeScript + SQLite (`better-sqlite3`)
+- Local DB: `~/.litreview/data.db`
 
 ## License
 
