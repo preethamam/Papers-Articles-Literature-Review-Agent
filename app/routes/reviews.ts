@@ -81,12 +81,41 @@ router.post("/:articleId", async (req: Request, res: Response) => {
     });
 
     for await (const chunk of stream) {
-      const content = chunk.choices?.[0]?.delta?.content;
-      if (content) {
-        fullText += content;
-        res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      if (chunk.error) {
+        const msg = chunk.error.message || "OpenRouter stream error";
+        res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+        return;
+      }
+      const delta = chunk.choices?.[0]?.delta;
+      const refusal =
+        typeof delta?.refusal === "string" && delta.refusal.trim() ? delta.refusal.trim() : "";
+      if (refusal) {
+        const bit = `\n[Refusal: ${refusal}]`;
+        fullText += bit;
+        res.write(`data: ${JSON.stringify({ content: bit })}\n\n`);
+      }
+      const content = typeof delta?.content === "string" ? delta.content : "";
+      const reasoning = typeof delta?.reasoning === "string" ? delta.reasoning : "";
+      const piece = content + reasoning;
+      if (piece) {
+        fullText += piece;
+        res.write(`data: ${JSON.stringify({ content: piece })}\n\n`);
       }
       if (chunk.usage) res.write(`data: ${JSON.stringify({ usage: chunk.usage })}\n\n`);
+    }
+
+    if (!fullText.trim()) {
+      res.write(
+        `data: ${JSON.stringify({
+          error:
+            "Model returned no text (empty stream). Try another model, check OpenRouter status, or confirm your API key and rate limits.",
+        })}\n\n`,
+      );
+      res.write("data: [DONE]\n\n");
+      res.end();
+      return;
     }
 
     upsertReview(articleId, taskNum, model, fullText, effectiveDepth);

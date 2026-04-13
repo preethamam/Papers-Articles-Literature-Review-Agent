@@ -113,11 +113,22 @@ function LlmTaskCard({
             className="text-[11px] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 max-w-[200px]"
           >
             {models.length === 0 && <option value={modelValue}>{modelValue}</option>}
-            {models.slice(0, 50).map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.id}
-              </option>
-            ))}
+            {(() => {
+              const visible = models.slice(0, 50)
+              const needCustom = modelValue && !visible.some((m) => m.id === modelValue)
+              return (
+                <>
+                  {needCustom && (
+                    <option value={modelValue}>{modelValue}</option>
+                  )}
+                  {visible.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.id}
+                    </option>
+                  ))}
+                </>
+              )
+            })()}
           </select>
           {taskNum === 2 && task2Depth && onTask2DepthChange && (
             <select
@@ -247,9 +258,11 @@ export default function ArticlePage() {
   const authorsList = article ? parseAuthorsJson(article.authors ?? null) : []
   const links = article ? parseLinksJson(article.links_json ?? null) : []
 
-  const refetchArticle = useCallback(() => {
-    if (!id) return
-    getArticle(id).then(setArticle).catch(() => {})
+  const refetchArticle = useCallback((): Promise<void> => {
+    if (!id) return Promise.resolve()
+    return getArticle(id)
+      .then(setArticle)
+      .then(() => undefined)
   }, [id])
 
   const handleGenerate = useCallback(
@@ -271,14 +284,23 @@ export default function ArticlePage() {
       )
         .then(() => {
           setGenLoading(null)
-          setGenStream((s) => {
-            const next = { ...s }
-            delete next[key]
-            return next
-          })
-          refetchArticle()
+          return refetchArticle()
+            .then(() => {
+              setGenStream((s) => {
+                const next = { ...s }
+                delete next[key]
+                return next
+              })
+            })
+            .catch(() => {
+              /* keep streamed text if reload fails */
+            })
         })
-        .catch(() => setGenLoading(null))
+        .catch((e: unknown) => {
+          setGenLoading(null)
+          const msg = e instanceof Error ? e.message : 'Request failed'
+          setGenStream((s) => ({ ...s, [key]: (s[key] || '') + `\n[Error: ${msg}]` }))
+        })
     },
     [id, article, selectedModel, defaultModels, task2Depth, refetchArticle],
   )

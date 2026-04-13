@@ -115,7 +115,11 @@ export default function ArticleDrawer({ article, articleId, onClose, onRefetch }
           onRefetch?.()
         })
       })
-      .catch(() => setLoadingTask(null))
+      .catch((e: unknown) => {
+        setLoadingTask(null)
+        const msg = e instanceof Error ? e.message : 'Request failed'
+        setStreaming((s) => ({ ...s, [key]: (s[key] || '') + `\n[Error: ${msg}]` }))
+      })
   }
 
   useEffect(() => {
@@ -502,9 +506,21 @@ function ReviewTab({
           className="text-[12px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white"
         >
           {modelSelect.models.length === 0 && <option value={modelSelect.value}>{modelSelect.value}</option>}
-          {modelSelect.models.slice(0, 50).map((m) => (
-            <option key={m.id} value={m.id}>{m.id}</option>
-          ))}
+          {(() => {
+            const visible = modelSelect.models.slice(0, 50)
+            const v = modelSelect.value
+            const needCustom = v && !visible.some((m) => m.id === v)
+            return (
+              <>
+                {needCustom && <option value={v}>{v}</option>}
+                {visible.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.id}
+                  </option>
+                ))}
+              </>
+            )
+          })()}
         </select>
         {task === 2 && task2Depth && onTask2DepthChange && (
           <select

@@ -246,7 +246,17 @@ export function runReview(
       ...(task === 2 ? { depth: depth ?? 'detailed' } : {}),
     }),
   }).then(async (res) => {
-    if (!res.ok) throw new Error(res.statusText)
+    if (!res.ok) {
+      let msg = res.statusText || 'Request failed'
+      const text = await res.text()
+      try {
+        const j = JSON.parse(text) as { error?: string }
+        if (j.error) msg = j.error
+      } catch {
+        if (text.trim()) msg = text.slice(0, 500)
+      }
+      throw new Error(msg)
+    }
     const ct = res.headers.get('content-type') || ''
     if (ct.includes('application/json')) {
       const data = (await res.json()) as { result?: string; cached?: boolean }
@@ -257,22 +267,36 @@ export function runReview(
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     let buf = ''
+    const processSseLine = (line: string) => {
+      if (!line.startsWith('data: ')) return
+      const payload = line.slice(6).trim()
+      if (payload === '[DONE]') return
+      try {
+        const data = JSON.parse(payload) as {
+          content?: string
+          usage?: Record<string, unknown>
+          error?: string
+        }
+        if (data.content) onChunk?.(data.content)
+        if (data.usage) onUsage?.(data.usage)
+        if (data.error) onError?.(data.error)
+      } catch {
+        /* ignore malformed chunk */
+      }
+    }
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
-      buf += decoder.decode(value, { stream: true })
+      if (value) buf += decoder.decode(value, { stream: true })
+      if (done) {
+        for (const line of buf.split('\n')) {
+          if (line.length) processSseLine(line)
+        }
+        break
+      }
       const lines = buf.split('\n')
       buf = lines.pop() ?? ''
       for (const line of lines) {
-        if (!line.startsWith('data: ')) continue
-        const payload = line.slice(6)
-        if (payload === '[DONE]') continue
-        try {
-          const data = JSON.parse(payload)
-          if (data.content) onChunk?.(data.content)
-          if (data.usage) onUsage?.(data.usage)
-          if (data.error) onError?.(data.error)
-        } catch {}
+        if (line.length) processSseLine(line)
       }
     }
   })
@@ -351,22 +375,36 @@ export function sendChat(
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     let buf = ''
+    const processSseLine = (line: string) => {
+      if (!line.startsWith('data: ')) return
+      const payload = line.slice(6).trim()
+      if (payload === '[DONE]') return
+      try {
+        const data = JSON.parse(payload) as {
+          content?: string
+          usage?: Record<string, unknown>
+          error?: string
+        }
+        if (data.content) onChunk(data.content)
+        if (data.usage) onUsage?.(data.usage)
+        if (data.error) onError?.(data.error)
+      } catch {
+        /* ignore malformed chunk */
+      }
+    }
     function read(): Promise<void> {
       return reader.read().then(({ done, value }) => {
-        if (done) return
-        buf += decoder.decode(value, { stream: true })
+        if (value) buf += decoder.decode(value, { stream: true })
+        if (done) {
+          for (const line of buf.split('\n')) {
+            if (line.length) processSseLine(line)
+          }
+          return
+        }
         const lines = buf.split('\n')
         buf = lines.pop() ?? ''
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const payload = line.slice(6)
-          if (payload === '[DONE]') continue
-          try {
-            const data = JSON.parse(payload)
-            if (data.content) onChunk(data.content)
-            if (data.usage) onUsage?.(data.usage)
-            if (data.error) onError?.(data.error)
-          } catch {}
+          if (line.length) processSseLine(line)
         }
         return read()
       })
