@@ -4,6 +4,9 @@ export const DEFAULT_MODEL_ID = "openrouter/free";
 /** OpenRouter Auto Router — picks an optimal model per prompt (NotDiamond). */
 export const OPTIMAL_ROUTER_MODEL = "openrouter/auto";
 
+/** OpenRouter rejects requests when `models` (fallback list) has more than 3 entries. */
+export const OPENROUTER_MODELS_FALLBACK_MAX = 3;
+
 /** Routers that should be upgraded to optimal auto-selection at request time. */
 const AUTO_ROUTER_IDS = new Set([DEFAULT_MODEL_ID, OPTIMAL_ROUTER_MODEL]);
 
@@ -25,14 +28,32 @@ export const OPTIMAL_CHAT_ALLOWLIST: string[] = [
   "stepfun/step-3.5-flash",
 ];
 
-/** Priority fallbacks if the auto-router or primary endpoint errors. */
+/**
+ * Priority fallbacks if the auto-router or primary endpoint errors.
+ * OpenRouter allows at most OPENROUTER_MODELS_FALLBACK_MAX entries — do not exceed.
+ */
 export const OPTIMAL_CHAT_FALLBACKS: string[] = [
   "meta-llama/llama-3.3-70b-instruct:free",
   "google/gemini-2.5-flash",
-  "anthropic/claude-3.5-sonnet",
   "openai/gpt-4o-mini",
-  "deepseek/deepseek-chat-v3-0324:free",
 ];
+
+export function capOpenRouterFallbackModels(models: string[]): string[] {
+  return models.slice(0, OPENROUTER_MODELS_FALLBACK_MAX);
+}
+
+/** Plugins + capped `models` fallbacks for OpenRouter chat.send params. */
+export function openRouterRoutingExtras(chatModel: ChatModelRequest): {
+  plugins?: ChatModelRequest["plugins"];
+  models?: string[];
+} {
+  const extras: { plugins?: ChatModelRequest["plugins"]; models?: string[] } = {};
+  if (chatModel.plugins?.length) extras.plugins = chatModel.plugins;
+  if (chatModel.models?.length) {
+    extras.models = capOpenRouterFallbackModels(chatModel.models);
+  }
+  return extras;
+}
 
 export type ChatModelRequest = {
   /** Model id sent to OpenRouter. */
@@ -57,12 +78,13 @@ export function buildChatModelRequest(requested?: string | null): ChatModelReque
     return { model: requestedModel, usedOptimalRouter: false, requestedModel };
   }
 
+  const fallbacks = capOpenRouterFallbackModels(OPTIMAL_CHAT_FALLBACKS);
   return {
     model: OPTIMAL_ROUTER_MODEL,
     usedOptimalRouter: true,
     requestedModel,
     plugins: [{ id: "auto-router", allowed_models: OPTIMAL_CHAT_ALLOWLIST }],
-    models: OPTIMAL_CHAT_FALLBACKS,
+    models: fallbacks.length > 0 ? fallbacks : undefined,
   };
 }
 

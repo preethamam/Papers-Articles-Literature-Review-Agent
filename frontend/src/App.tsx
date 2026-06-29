@@ -100,7 +100,7 @@ function Sidebar() {
           {theme === 'dark' ? 'Light mode' : 'Dark mode'}
         </button>
         <div className="border-t border-white/[0.06] pt-4">
-          <p className="text-[10px] text-slate-600 font-medium">v2.0.0 · Standalone</p>
+          <p className="text-[10px] text-slate-600 font-medium">v2.0.7 · Standalone</p>
         </div>
       </div>
     </aside>

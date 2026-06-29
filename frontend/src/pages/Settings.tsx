@@ -47,6 +47,14 @@ const OPENROUTER_VLM_SUGGESTIONS = [
   'anthropic/claude-3.5-sonnet',
 ]
 
+const SETTINGS_TABS = [
+  { id: 'general', label: 'General', icon: Key },
+  { id: 'models', label: 'Models', icon: Cpu },
+  { id: 'parsing', label: 'PDF Parsing', icon: FileSearch },
+] as const
+
+type SettingsTabId = (typeof SETTINGS_TABS)[number]['id']
+
 export default function Settings() {
   const [settings, setSettings] = useState<Settings>({})
   const [models, setModels] = useState<Array<{ id: string; name?: string }>>([])
@@ -67,6 +75,7 @@ export default function Settings() {
   const [quitting, setQuitting] = useState(false)
   const [dotsAlive, setDotsAlive] = useState<boolean | null>(null)
   const [chandraAlive, setChandraAlive] = useState<boolean | null>(null)
+  const [activeTab, setActiveTab] = useState<SettingsTabId>('general')
 
   useEffect(() => {
     setDesktopApp(isElectronApp())
@@ -264,7 +273,27 @@ export default function Settings() {
         </p>
       </div>
 
+      <div className="flex items-center gap-1 mb-6 border-b border-slate-200 dark:border-slate-800">
+        {SETTINGS_TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setActiveTab(id)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium -mb-px border-b-2 transition-colors ${
+              activeTab === id
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="space-y-6">
+        {activeTab === 'general' && (
+        <>
         <SystemCheck />
 
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-card border border-slate-100 dark:border-slate-800">
@@ -291,7 +320,11 @@ export default function Settings() {
             Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">openrouter.ai/keys</a>
           </p>
         </div>
+        </>
+        )}
 
+        {activeTab === 'parsing' && (
+        <>
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-card border border-slate-100 dark:border-slate-800">
           <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-4">
             <Layers className="w-4 h-4" /> OpenDataLoader PDF
@@ -574,7 +607,11 @@ export default function Settings() {
             </div>
           </div>
         </div>
+        </>
+        )}
 
+        {activeTab === 'models' && (
+        <>
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-card border border-slate-100 dark:border-slate-800">
           <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-4">
             <BarChart3 className="w-4 h-4" /> Models &amp; Benchmarks
@@ -640,7 +677,10 @@ export default function Settings() {
             </label>
           </div>
         </div>
+        </>
+        )}
 
+        {activeTab === 'parsing' && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-card border border-slate-100 dark:border-slate-800">
           <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-4">
             <FileSearch className="w-4 h-4" /> PDF parser
@@ -759,6 +799,7 @@ export default function Settings() {
             </label>
           </div>
         </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
           <button
@@ -771,7 +812,7 @@ export default function Settings() {
           </button>
         </div>
 
-        {desktopApp && (
+        {activeTab === 'general' && desktopApp && (
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-card border border-slate-100 dark:border-slate-800">
             <h2 className="flex items-center gap-2 text-[15px] font-semibold text-slate-800 dark:text-slate-100 mb-2">
               <Power className="w-4 h-4" /> Quit application

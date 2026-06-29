@@ -1,7 +1,8 @@
 import { useId, useRef } from 'react'
-import { Send, StopCircle } from 'lucide-react'
+import { ChevronDown, ChevronUp, Send, StopCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePromptComposer } from '@/hooks/usePromptComposer'
+import { usePromptHistory } from '@/hooks/usePromptHistory'
 import type { GeneratedPrompt, PromptComposeContext } from '@/lib/promptComposer'
 
 type PromptInputBarProps = {
@@ -37,12 +38,12 @@ export default function PromptInputBar({
     setHighlightIndex,
     showDropdown,
     highlighted,
-    liveMessage,
+    liveMessage: composerLiveMessage,
     acceptSuggestion,
     handleFocus,
     handleBlur,
-    handleChange,
-    handleKeyDown,
+    handleChange: handleComposerChange,
+    handleKeyDown: handleComposerKeyDown,
   } = usePromptComposer({
     value,
     onChange,
@@ -51,18 +52,35 @@ export default function PromptInputBar({
     disabled: inputDisabled,
   })
 
+  const {
+    promptHistory,
+    handleKeyDown: handleHistoryKeyDown,
+    noteUserEdit,
+    liveMessage: historyLiveMessage,
+  } = usePromptHistory({
+    value,
+    onChange,
+    disabled: inputDisabled,
+    showDropdown,
+  })
+
+  const liveMessage = historyLiveMessage || composerLiveMessage
+
   return (
     <div className="flex gap-3 max-w-4xl mx-auto flex-1 min-w-0">
       <div className="relative flex-1 min-w-0 rounded-xl border border-slate-200/60 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-300 transition-all">
         <textarea
           ref={textareaRef}
           value={value}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={(e) => {
+            noteUserEdit()
+            handleComposerChange(e.target.value)
+          }}
           onFocus={handleFocus}
           onBlur={handleBlur}
           onKeyDown={(e) => {
-            const handled = handleKeyDown(e)
-            if (handled) return
+            if (handleComposerKeyDown(e)) return
+            if (handleHistoryKeyDown(e)) return
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               onSubmit()
@@ -78,8 +96,20 @@ export default function PromptInputBar({
           aria-activedescendant={
             showDropdown && highlighted ? `${listboxId}-option-${highlightIndex}` : undefined
           }
-          className="relative w-full resize-none bg-transparent rounded-xl px-4 py-3 text-[14px] text-slate-800 dark:text-slate-100 focus:outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 disabled:opacity-60"
+          className="relative w-full resize-none bg-transparent rounded-xl pl-4 pr-10 py-3 text-[14px] text-slate-800 dark:text-slate-100 focus:outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 disabled:opacity-60"
         />
+        <div
+          className={cn(
+            'absolute bottom-2 right-2 flex flex-col items-center pointer-events-none select-none',
+            promptHistory.length > 0 ? 'opacity-60' : 'opacity-35',
+          )}
+          title="Press ↑ and ↓ to cycle through recent prompts"
+          aria-label="Press up and down arrow keys to cycle through recent prompts"
+          aria-hidden="true"
+        >
+          <ChevronUp className="w-3 h-3 text-slate-400 dark:text-slate-500 -mb-0.5" strokeWidth={2.5} />
+          <ChevronDown className="w-3 h-3 text-slate-400 dark:text-slate-500" strokeWidth={2.5} />
+        </div>
         <div className="sr-only" aria-live="polite">
           {liveMessage}
         </div>

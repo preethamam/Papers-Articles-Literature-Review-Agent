@@ -16,6 +16,7 @@ import { DEFAULT_MODEL_ID } from "../lib/modelDefaults.js";
 import {
   buildChatModelRequest,
   isSafetyClassifierOutput,
+  openRouterRoutingExtras,
   safetyClassifierUserMessage,
 } from "../lib/chatModelGuard.js";
 
@@ -120,8 +121,7 @@ router.post("/", async (req: Request, res: Response) => {
         model: chatModel.model,
         messages: messages as unknown as never[],
         stream: true,
-        ...(chatModel.plugins ? { plugins: chatModel.plugins } : {}),
-        ...(chatModel.models ? { models: chatModel.models } : {}),
+        ...openRouterRoutingExtras(chatModel),
       } as never,
     });
 

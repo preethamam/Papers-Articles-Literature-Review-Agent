@@ -4,7 +4,7 @@ import { createOpenRouter } from "../lib/openrouter.js";
 import { getSetting } from "../db.js";
 import { PAPER_REVIEW_SYSTEM, TASK2_DEPTH_INSTRUCTIONS } from "../lib/prompts.js";
 import { DEFAULT_MODEL_ID } from "../lib/modelDefaults.js";
-import { buildChatModelRequest } from "../lib/chatModelGuard.js";
+import { buildChatModelRequest, openRouterRoutingExtras } from "../lib/chatModelGuard.js";
 
 const TASK_LABELS: Record<number, string> = {
   1: "Extract metadata and links (Option 1)",
@@ -112,8 +112,7 @@ router.post("/:articleId", async (req: Request, res: Response) => {
           { role: "user", content: userMsg },
         ],
         stream: true,
-        ...(chatModel.plugins ? { plugins: chatModel.plugins } : {}),
-        ...(chatModel.models ? { models: chatModel.models } : {}),
+        ...openRouterRoutingExtras(chatModel),
       } as never,
     });
 

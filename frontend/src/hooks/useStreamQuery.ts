@@ -12,10 +12,12 @@ export type StreamQueryOptions = {
 export function useStreamQuery() {
   const [isStreaming, setIsStreaming] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const { addMessage, updateLastAssistant } = useAppStore()
+  const { addMessage, updateLastAssistant, pushPromptHistory } = useAppStore()
 
   const sendMessage = (question: string, opts?: StreamQueryOptions) => {
     if (isStreaming) return
+
+    pushPromptHistory(question)
 
     abortControllerRef.current?.abort()
     const controller = new AbortController()

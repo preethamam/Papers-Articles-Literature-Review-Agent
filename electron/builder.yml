@@ -44,9 +44,22 @@ mac:
 
 dmg:
   title: Lit Review Agent ${version}
+  # Use the app icon as the mounted volume icon so the logo shows on the disk image.
+  icon: build/icon.png
+  iconSize: 128
+  iconTextSize: 13
   window:
-    width: 540
-    height: 380
+    width: 600
+    height: 420
+  # App icon front-and-center on the left, drag-to-Applications on the right.
+  contents:
+    - x: 165
+      y: 210
+      type: file
+    - x: 435
+      y: 210
+      type: link
+      path: /Applications
 
 win:
   target:
